@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450">
+  <defs>
+    <linearGradient id="chocBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3c1b11"/>
+      <stop offset="50%" stop-color="#240f08"/>
+      <stop offset="100%" stop-color="#140703"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d070"/>
+      <stop offset="100%" stop-color="#c89228"/>
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a2c1b"/>
+      <stop offset="100%" stop-color="#2e140a"/>
+    </linearGradient>
+  </defs>
+  
+  <rect width="600" height="450" fill="url(#chocBg)"/>
+  
+  <!-- Subtle circular glow -->
+  <circle cx="300" cy="210" r="140" fill="#d49b43" opacity="0.12" filter="blur(30px)"/>
+  
+  <!-- Chocolate Bar Illustration -->
+  <g transform="translate(210, 100)">
+    <!-- Base block shadow -->
+    <rect x="5" y="10" width="170" height="150" rx="16" fill="#0d0402" opacity="0.5"/>
+    
+    <!-- Main Chocolate Block -->
+    <rect x="0" y="0" width="180" height="155" rx="16" fill="url(#barGrad)" stroke="#6d3622" stroke-width="2"/>
+    
+    <!-- Chocolate Grid Segments -->
+    <rect x="15" y="15" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+    <rect x="70" y="15" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+    <rect x="125" y="15" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+    
+    <rect x="15" y="85" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+    <rect x="70" y="85" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+    <rect x="125" y="85" width="40" height="55" rx="6" fill="#421d10" stroke="#753c27" stroke-width="1.5"/>
+  </g>
+  
+  <!-- Ribbon / Brand badge -->
+  <g transform="translate(300, 290)">
+    <circle cx="0" cy="0" r="28" fill="#522415" stroke="url(#goldGrad)" stroke-width="2"/>
+    <text x="0" y="8" font-family="serif" font-size="22" font-weight="bold" fill="#f7d070" text-anchor="middle">Z</text>
+  </g>
+  
+  <text x="300" y="350" font-family="serif" font-size="24" font-weight="bold" fill="#fdfbf7" text-anchor="middle" letter-spacing="2">ZORA SHOP</text>
+  <text x="300" y="380" font-family="sans-serif" font-size="14" font-style="italic" fill="#e8c28a" text-anchor="middle">Handcrafted Homemade Chocolate</text>
+  <text x="300" y="405" font-family="sans-serif" font-size="11" font-weight="600" fill="#a87f4f" text-anchor="middle">"Sweetness in Every Bite!"</text>
+</svg>
+
