@@ -1,417 +1,338 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_PRODUCTS, INITIAL_ORDERS } from '../data/products';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '../api/client';
+import { INITIAL_PRODUCTS } from '../data/products';
 
 const ShopContext = createContext();
-
-const SEED_CUSTOMERS = [
-  {
-    id: 'cust-1',
-    name: 'Priya Sharma',
-    email: 'priya.sharma@gmail.com',
-    phone: '9823456789',
-    address: {
-      house: 'Flat 402, Sunshine Heights',
-      street: 'Near Jogger’s Park, Viman Nagar',
-      landmark: 'Opposite Cafe Mocha',
-      city: 'Pune',
-      state: 'Maharashtra',
-      pincode: '411014',
-      instructions: 'Please call before delivery'
-    },
-    registeredDate: '2026-10-15',
-    ordersCount: 2
-  },
-  {
-    id: 'cust-2',
-    name: 'Rohan Mehta',
-    email: 'rohan.mehta@gmail.com',
-    phone: '9823456788',
-    address: {
-      house: 'B-14, Green Glen Towers',
-      street: 'Bellandur Main Road',
-      landmark: 'Near EcoSpace Tech Park',
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      pincode: '560103',
-      instructions: 'Leave at reception'
-    },
-    registeredDate: '2026-11-01',
-    ordersCount: 1
-  },
-  {
-    id: 'cust-3',
-    name: 'Ananya Deshmukh',
-    email: 'ananya.d@gmail.com',
-    phone: '9765432198',
-    address: {
-      house: 'Flat 101, Nilgiri Villa',
-      street: 'Law College Road, Erandwane',
-      landmark: 'Behind Film Institute',
-      city: 'Pune',
-      state: 'Maharashtra',
-      pincode: '411004',
-      instructions: 'Ring doorbell twice'
-    },
-    registeredDate: '2026-11-05',
-    ordersCount: 1
-  }
-];
 
 const DEFAULT_SETTINGS = {
   shopName: 'ZORA SHOP',
   tagline: 'Sweetness in Every Bite!',
   whatsappNumber: '+91 98980 14090',
-  contactEmail: 'orders@zorashop.demo',
-  shopAddress: 'Boutique Kitchen #14, Royal Palm Avenue, Pune, Maharashtra - 411001',
-  deliveryFee: 40,
-  freeDeliveryThreshold: 500,
-  promoCode: 'ZORA10',
-  promoDiscountPercent: 10
+  contactEmail: 'zorashop.homemade@gmail.com',
+  shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
+  standardDeliveryFee: 40,
+  deliveryFeeThreshold: 500
 };
 
 export const ShopProvider = ({ children }) => {
   // Session Role: 'customer' | 'shopkeeper' | null
-  const [sessionRole, setSessionRole] = useState(() => {
-    try {
-      return localStorage.getItem('zora_session_role') || null;
-    } catch {
-      return null;
-    }
-  });
+  const [sessionRole, setSessionRole] = useState(null);
+  const [currentCustomer, setCurrentCustomer] = useState(null);
+  const [adminUser, setAdminUser] = useState(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
-  // Current logged in customer
-  const [currentCustomer, setCurrentCustomer] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_current_customer');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
+  // Products Catalog (live from backend API)
+  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [isProductsLoading, setIsProductsLoading] = useState(false);
 
-  // Registered customers list
-  const [registeredCustomers, setRegisteredCustomers] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_registered_customers');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return SEED_CUSTOMERS;
-    } catch {
-      return SEED_CUSTOMERS;
-    }
-  });
-
-  // Customer Login Events Counter (distinct from unique registered customers)
-  const [customerLoginCount, setCustomerLoginCount] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_login_events_count');
-      return saved ? Number(saved) : 14;
-    } catch {
-      return 14;
-    }
-  });
-
-  // Admin / Shopkeeper logged in state
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    try {
-      return localStorage.getItem('zora_admin_logged') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  // Products catalog (automatically updates to full 52 products catalog and repairs image links)
-  const [products, setProducts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_products');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= INITIAL_PRODUCTS.length) {
-          return parsed.map((p) => {
-            if (p.id === 'prod-almond' && (p.image?.includes('500e391a7657') || !p.image)) {
-              return { ...p, image: 'https://images.unsplash.com/photo-1511381939415-e44015466834?auto=format&fit=crop&w=800&q=80' };
-            }
-            return p;
-          });
-        }
-      }
-      return INITIAL_PRODUCTS;
-    } catch {
-      return INITIAL_PRODUCTS;
-    }
-  });
-
-  // Shopping cart
+  // Shopping Cart (persisted locally for instant reactivity, verified by server on checkout)
   const [cart, setCart] = useState(() => {
     try {
       const saved = localStorage.getItem('zora_cart');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
 
-  // Orders list
-  const [orders, setOrders] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_orders');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return INITIAL_ORDERS;
-    } catch {
-      return INITIAL_ORDERS;
-    }
-  });
-
-  // Active placed order ID
-  const [activeOrderId, setActiveOrderId] = useState(() => {
-    try {
-      return localStorage.getItem('zora_active_order_id') || 'ZS-74921';
-    } catch {
-      return 'ZS-74921';
-    }
-  });
-
-  // Store settings
-  const [shopSettings, setShopSettings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('zora_settings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return { ...DEFAULT_SETTINGS, ...parsed };
-      }
-      return DEFAULT_SETTINGS;
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
-
-  // Toast notifications
-  const [toasts, setToasts] = useState([]);
+  // UI States
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [activeOrderId, setActiveOrderId] = useState(null);
+  const [toasts, setToasts] = useState([]);
 
-  // Sync to localStorage
-  useEffect(() => {
-    try {
-      if (sessionRole) {
-        localStorage.setItem('zora_session_role', sessionRole);
-      } else {
-        localStorage.removeItem('zora_session_role');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [sessionRole]);
+  // Store Settings (from server)
+  const [shopSettings, setShopSettings] = useState(DEFAULT_SETTINGS);
 
-  useEffect(() => {
-    try {
-      if (currentCustomer) {
-        localStorage.setItem('zora_current_customer', JSON.stringify(currentCustomer));
-      } else {
-        localStorage.removeItem('zora_current_customer');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, [currentCustomer]);
+  // Admin Data (populated when logged in as shopkeeper)
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [adminCustomers, setAdminCustomers] = useState([]);
+  const [adminStats, setAdminStats] = useState({
+    totalCustomers: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    confirmedOrders: 0,
+    deliveredOrders: 0,
+    cancelledOrders: 0,
+    totalRevenue: 0,
+    avgOrderValue: 0
+  });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('zora_registered_customers', JSON.stringify(registeredCustomers));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [registeredCustomers]);
+  // Customer orders
+  const [customerOrders, setCustomerOrders] = useState([]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('zora_login_events_count', String(customerLoginCount));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [customerLoginCount]);
+  // Toast notifications
+  const addToast = useCallback((message, type = 'success') => {
+    const id = Date.now() + Math.random().toString(36).substr(2, 4);
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('zora_admin_logged', isAdminLoggedIn ? 'true' : 'false');
-    } catch (e) {
-      console.error(e);
-    }
-  }, [isAdminLoggedIn]);
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('zora_products', JSON.stringify(products));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [products]);
-
+  // Save Cart to local storage
   useEffect(() => {
     try {
       localStorage.setItem('zora_cart', JSON.stringify(cart));
     } catch (e) {
-      console.error(e);
+      console.error('Error saving cart:', e);
     }
   }, [cart]);
 
-  useEffect(() => {
+  // Fetch Live Products from Server
+  const fetchProducts = useCallback(async () => {
+    setIsProductsLoading(true);
     try {
-      localStorage.setItem('zora_orders', JSON.stringify(orders));
-    } catch (e) {
-      console.error(e);
+      const res = await api.getProducts();
+      if (res.success && Array.isArray(res.products) && res.products.length > 0) {
+        setProducts(res.products);
+      }
+    } catch (err) {
+      console.warn('Using initial products catalogue:', err.message);
+    } finally {
+      setIsProductsLoading(false);
     }
-  }, [orders]);
+  }, []);
+
+  // Check Existing Sessions on App Mount
+  useEffect(() => {
+    async function initSessions() {
+      setIsAuthChecking(true);
+      fetchProducts();
+
+      // Check Customer Session
+      try {
+        const custRes = await api.getCustomerMe();
+        if (custRes.success && custRes.customer) {
+          setCurrentCustomer(custRes.customer);
+          setSessionRole('customer');
+          setIsAuthChecking(false);
+          return;
+        }
+      } catch (e) {}
+
+      // Check Admin Session
+      try {
+        const adminRes = await api.getAdminMe();
+        if (adminRes.success && adminRes.admin) {
+          setAdminUser(adminRes.admin);
+          setSessionRole('shopkeeper');
+          setIsAuthChecking(false);
+          return;
+        }
+      } catch (e) {}
+
+      setIsAuthChecking(false);
+    }
+
+    initSessions();
+  }, [fetchProducts]);
+
+  // Fetch Admin Data when Shopkeeper logs in
+  const refreshAdminData = useCallback(async () => {
+    try {
+      const [statsRes, ordersRes, custsRes, settingsRes] = await Promise.allSettled([
+        api.getAdminStats(),
+        api.getAdminOrders(),
+        api.getAdminCustomers(),
+        api.getStoreSettings()
+      ]);
+
+      if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+        setAdminStats(statsRes.value.stats);
+      }
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.success) {
+        setAdminOrders(ordersRes.value.orders);
+      }
+      if (custsRes.status === 'fulfilled' && custsRes.value?.success) {
+        setAdminCustomers(custsRes.value.customers);
+      }
+      if (settingsRes.status === 'fulfilled' && settingsRes.value?.success && settingsRes.value.settings) {
+        setShopSettings(settingsRes.value.settings);
+      }
+    } catch (err) {
+      console.error('Error refreshing admin data:', err);
+    }
+  }, []);
+
+  const saveStoreSettings = useCallback(async (newSettings) => {
+    try {
+      const res = await api.updateStoreSettings(newSettings);
+      if (res.success && res.settings) {
+        setShopSettings(res.settings);
+        addToast('Store settings saved successfully!', 'success');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      addToast(err.message || 'Failed to save settings', 'error');
+      return false;
+    }
+  }, [addToast]);
 
   useEffect(() => {
-    try {
-      if (activeOrderId) localStorage.setItem('zora_active_order_id', activeOrderId);
-    } catch (e) {
-      console.error(e);
+    if (sessionRole === 'shopkeeper') {
+      refreshAdminData();
     }
-  }, [activeOrderId]);
+  }, [sessionRole, refreshAdminData]);
+
+  // Fetch Customer Orders when Customer is active
+  const refreshCustomerOrders = useCallback(async () => {
+    if (!currentCustomer) return;
+    try {
+      const res = await api.getMyOrders();
+      if (res.success) {
+        setCustomerOrders(res.orders || []);
+      }
+    } catch (err) {
+      console.error('Error fetching customer orders:', err);
+    }
+  }, [currentCustomer]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('zora_settings', JSON.stringify(shopSettings));
-    } catch (e) {
-      console.error(e);
+    if (sessionRole === 'customer') {
+      refreshCustomerOrders();
     }
-  }, [shopSettings]);
+  }, [sessionRole, refreshCustomerOrders]);
 
-  // Toast System
-  const addToast = (message, type = 'success') => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
+  // ==========================================================================
+  // REAL AUTHENTICATION ACTIONS (Dual OTP: Email + Mobile)
+  // ==========================================================================
+
+  // Customer: Request OTPs
+  const sendCustomerOtp = async ({ name, email, phone }) => {
+    try {
+      const res = await api.sendCustomerOtp({ name, email, phone });
+      addToast('Verification codes sent to your Email & Mobile number!', 'info');
+      return res;
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
+    }
   };
 
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // 1. Customer Authentication & Registration
-  const customerLogin = ({ name, email, phone }) => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanName = (name || '').trim();
-    const cleanPhone = (phone || '').trim();
-
-    // Check if customer already exists in registered list
-    const existing = registeredCustomers.find(
-      (c) => c.email.toLowerCase() === cleanEmail || c.phone === cleanPhone
-    );
-
-    let customerObj;
-    if (existing) {
-      customerObj = { ...existing, name: cleanName || existing.name };
-    } else {
-      customerObj = {
-        id: `cust-${Date.now()}`,
-        name: cleanName || 'Chocolate Lover',
-        email: cleanEmail,
-        phone: cleanPhone,
-        address: {
-          house: 'Flat 402, Sunshine Heights',
-          street: 'Near Jogger’s Park, Viman Nagar',
-          landmark: 'Opposite Cafe Mocha',
-          city: 'Pune',
-          state: 'Maharashtra',
-          pincode: '411014',
-          instructions: 'Call upon arrival'
-        },
-        registeredDate: new Date().toISOString().split('T')[0],
-        ordersCount: 0
-      };
-      setRegisteredCustomers((prev) => [customerObj, ...prev]);
+  // Customer: Verify both OTPs
+  const verifyCustomerOtp = async ({ name, email, phone, emailOtp, mobileOtp }) => {
+    try {
+      const res = await api.verifyCustomerOtp({ name, email, phone, emailOtp, mobileOtp });
+      if (res.success && res.customer) {
+        setCurrentCustomer(res.customer);
+        setSessionRole('customer');
+        addToast(`Welcome ${res.customer.name}! Enjoy fresh handcrafted chocolates.`);
+        return res.customer;
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
     }
-
-    setCurrentCustomer(customerObj);
-    setSessionRole('customer');
-    setCustomerLoginCount((count) => count + 1);
-    addToast(`Welcome to ZORA SHOP, ${customerObj.name}! 🍫`);
-    return customerObj;
   };
 
-  const customerLogout = () => {
+  // Customer: Logout
+  const customerLogout = async () => {
+    try {
+      await api.customerLogout();
+    } catch (e) {}
     setCurrentCustomer(null);
     setSessionRole(null);
-    addToast('Logged out of customer session', 'info');
+    addToast('Logged out successfully.');
   };
 
-  // 2. Shopkeeper Authentication
-  const shopkeeperLogin = (email, password) => {
-    if (email === 'admin@zorashop.demo' && password === 'demo123') {
-      setIsAdminLoggedIn(true);
-      setSessionRole('shopkeeper');
-      addToast('Welcome back, Shopkeeper! 🏪');
-      return true;
+  // Customer: Update Profile & Address
+  const updateCustomerProfile = useCallback((profileData) => {
+    setCurrentCustomer((prev) => {
+      const updated = {
+        ...prev,
+        ...profileData,
+        address: profileData.address ? { ...prev?.address, ...profileData.address } : prev?.address
+      };
+      return updated;
+    });
+    addToast('Profile & delivery address updated successfully!', 'success');
+  }, [addToast]);
+
+  // Shopkeeper: Request OTPs
+  const sendAdminOtp = async ({ email }) => {
+    try {
+      const res = await api.sendAdminOtp({ email });
+      addToast('Owner verification codes dispatched to registered email & phone.', 'info');
+      return res;
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
     }
-    return false;
   };
 
-  const shopkeeperLogout = () => {
-    setIsAdminLoggedIn(false);
+  // Shopkeeper: Verify both OTPs
+  const verifyAdminOtp = async ({ email, emailOtp, mobileOtp }) => {
+    try {
+      const res = await api.verifyAdminOtp({ email, emailOtp, mobileOtp });
+      if (res.success && res.admin) {
+        setAdminUser(res.admin);
+        setSessionRole('shopkeeper');
+        addToast(`Owner access verified. Welcome, ${res.admin.name}!`);
+        return res.admin;
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
+    }
+  };
+
+  // Shopkeeper: Logout
+  const shopkeeperLogout = async () => {
+    try {
+      await api.adminLogout();
+    } catch (e) {}
+    setAdminUser(null);
     setSessionRole(null);
-    addToast('Logged out of Shopkeeper Dashboard', 'info');
+    addToast('Owner session closed.');
   };
 
-  // Switch Role / Back to First Screen
   const returnToRoleSelection = () => {
     setSessionRole(null);
   };
 
-  // 3. Cart Actions
+  // ==========================================================================
+  // SHOPPING CART ACTIONS
+  // ==========================================================================
   const addToCart = (product, packageType = 'pack250g', quantity = 1) => {
-    if (!product) return;
-    const unitPrice = packageType === 'piece' ? product.piecePrice : product.boxPrice;
-    const packageName = packageType === 'piece' ? 'Per Piece' : '250g Box';
+    const isPiece = packageType === 'piece';
+    const unitPrice = isPiece ? product.piecePrice : product.boxPrice;
+    const packageName = isPiece ? 'Per Piece' : '250g Box';
     const cartItemId = `${product.id}-${packageType}`;
 
     setCart((prev) => {
-      const safe = Array.isArray(prev) ? prev : [];
-      const existing = safe.find((item) => item.cartItemId === cartItemId);
-      if (existing) {
-        return safe.map((item) =>
-          item.cartItemId === cartItemId
-            ? { ...item, quantity: item.quantity + quantity, total: (item.quantity + quantity) * unitPrice }
-            : item
-        );
+      const existingIdx = prev.findIndex((item) => item.cartItemId === cartItemId);
+      if (existingIdx !== -1) {
+        const updated = [...prev];
+        const newQty = updated[existingIdx].quantity + quantity;
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: newQty,
+          total: newQty * unitPrice
+        };
+        return updated;
       } else {
         return [
-          ...safe,
+          ...prev,
           {
             cartItemId,
+            productId: product.id,
             id: product.id,
             name: product.name,
             packageType,
             packageName,
-            unitPrice,
+            price: unitPrice,
             quantity,
             total: unitPrice * quantity,
-            image: product.image,
-            category: product.category
+            image: product.image
           }
         ];
       }
     });
 
-    addToast(`Added ${quantity}× ${product.name} (${packageName}) to your cart! 🍫`);
-    setIsCartOpen(true);
+    addToast(`Added ${quantity}x ${product.name} (${packageName}) to your cart! 🍫`);
   };
 
   const updateCartQty = (cartItemId, newQty) => {
@@ -420,16 +341,16 @@ export const ShopProvider = ({ children }) => {
       return;
     }
     setCart((prev) =>
-      (Array.isArray(prev) ? prev : []).map((item) =>
+      prev.map((item) =>
         item.cartItemId === cartItemId
-          ? { ...item, quantity: newQty, total: newQty * item.unitPrice }
+          ? { ...item, quantity: newQty, total: item.price * newQty }
           : item
       )
     );
   };
 
   const removeFromCart = (cartItemId) => {
-    setCart((prev) => (Array.isArray(prev) ? prev : []).filter((item) => item.cartItemId !== cartItemId));
+    setCart((prev) => prev.filter((item) => item.cartItemId !== cartItemId));
     addToast('Item removed from cart', 'info');
   };
 
@@ -437,174 +358,107 @@ export const ShopProvider = ({ children }) => {
     setCart([]);
   };
 
-  const safeCart = Array.isArray(cart) ? cart : [];
-  const cartSubtotal = safeCart.reduce((sum, item) => sum + (item?.total || 0), 0);
-  const cartCount = safeCart.reduce((sum, item) => sum + (item?.quantity || 0), 0);
-  const deliveryFee = cartSubtotal >= (shopSettings?.freeDeliveryThreshold || 500) || cartSubtotal === 0 ? 0 : (shopSettings?.deliveryFee || 40);
+  // Derived cart calculations
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.total, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const deliveryFee = cartSubtotal >= 500 || cartSubtotal === 0 ? 0 : 40;
 
-  // 4. Order Actions
-  const placeOrder = ({ customer, address, paymentMethod, discount = 0 }) => {
-    const orderNum = Math.floor(10000 + Math.random() * 90000);
-    const newOrderId = `ZS-${orderNum}`;
-    const calculatedDelivery = cartSubtotal >= (shopSettings?.freeDeliveryThreshold || 500) ? 0 : (shopSettings?.deliveryFee || 40);
-    const grandTotal = Math.max(0, cartSubtotal + calculatedDelivery - discount);
-
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const newOrder = {
-      id: newOrderId,
-      createdAt: now.toISOString(),
-      customer,
-      address,
-      items: [...safeCart],
-      subtotal: cartSubtotal,
-      deliveryFee: calculatedDelivery,
-      discount,
-      grandTotal,
-      paymentMethod,
-      paymentStatus: paymentMethod === 'UPI' ? 'Paid (Simulated)' : 'Pending (Cash on Delivery)',
-      orderStatus: 'Order Placed',
-      timeline: [
-        { status: 'Order Placed', time: timeStr, completed: true },
-        { status: 'Order Confirmed', time: 'Pending', completed: false },
-        { status: 'Preparing Your Chocolates', time: 'Pending', completed: false },
-        { status: 'Out for Delivery', time: 'Pending', completed: false },
-        { status: 'Delivered', time: 'Pending', completed: false }
-      ]
-    };
-
-    setOrders((prev) => [newOrder, ...(Array.isArray(prev) ? prev : [])]);
-    setActiveOrderId(newOrderId);
-
-    // Update customer orders count in registered customers
-    setRegisteredCustomers((prev) =>
-      prev.map((c) =>
-        c.email.toLowerCase() === (customer.email || '').toLowerCase()
-          ? { ...c, ordersCount: (c.ordersCount || 0) + 1, address }
-          : c
-      )
-    );
-
-    if (currentCustomer) {
-      setCurrentCustomer((prev) => ({
-        ...prev,
-        ordersCount: (prev.ordersCount || 0) + 1,
-        address
-      }));
+  // ==========================================================================
+  // ORDER CHECKOUT (Backend Recalculated)
+  // ==========================================================================
+  const placeOrder = async ({ address, paymentMethod = 'COD', promoCode = '', notes = '' }) => {
+    if (!currentCustomer) {
+      addToast('Please login with Email & Mobile OTP before checking out.', 'warning');
+      throw new Error('Authentication required.');
     }
 
-    clearCart();
-    addToast(`Order #${newOrderId} placed successfully! 🎉`, 'success');
-    return newOrder;
+    try {
+      const res = await api.createCheckoutOrder({
+        items: cart,
+        address,
+        paymentMethod,
+        promoCode,
+        notes
+      });
+
+      if (res.success && res.order) {
+        clearCart();
+        setActiveOrderId(res.order.id);
+        refreshCustomerOrders();
+        return res;
+      }
+      throw new Error(res.message || 'Failed to place order.');
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
+    }
   };
 
-  // 5. Order Management Actions for Shopkeeper
-  const updateOrderStatus = (orderId, newStatus) => {
-    const statuses = [
-      'Order Placed',
-      'Order Confirmed',
-      'Preparing Your Chocolates',
-      'Out for Delivery',
-      'Delivered',
-      'Rejected'
-    ];
-
-    setOrders((prev) =>
-      (Array.isArray(prev) ? prev : []).map((order) => {
-        if (order.id !== orderId) return order;
-
-        const currentIdx = statuses.indexOf(newStatus);
-        const updatedTimeline = (order.timeline || []).map((step) => {
-          const stepIdx = statuses.indexOf(step.status);
-          const isCompleted = stepIdx <= currentIdx;
-          const now = new Date();
-          const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-          return {
-            ...step,
-            completed: isCompleted,
-            time: isCompleted ? (step.time === 'Pending' ? timeStr : step.time) : 'Pending'
-          };
-        });
-
-        return {
-          ...order,
-          orderStatus: newStatus,
-          timeline: updatedTimeline,
-          paymentStatus: newStatus === 'Delivered' && order.paymentMethod === 'COD' ? 'Paid (COD Collected)' : order.paymentStatus
-        };
-      })
-    );
-
-    addToast(`Order #${orderId} updated to "${newStatus}"!`, 'info');
+  // ==========================================================================
+  // ADMIN ORDER & CATALOG MANAGEMENT
+  // ==========================================================================
+  const updateOrderStatus = async (orderId, status, notes = '') => {
+    try {
+      const res = await api.updateOrderStatus(orderId, status, notes);
+      if (res.success) {
+        addToast(`Order ${res.order.orderNumber} status updated to "${status}"`);
+        refreshAdminData();
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+    }
   };
 
-  // 6. Product Management Actions for Shopkeeper
-  const addProduct = (newProduct) => {
-    const id = `prod-${Date.now()}`;
-    const slug = newProduct.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    const created = {
-      ...newProduct,
-      id,
-      slug,
-      rating: 5.0,
-      reviewsCount: 1,
-      isAvailable: true
-    };
-    setProducts((prev) => [created, ...(Array.isArray(prev) ? prev : [])]);
-    addToast(`Added ${newProduct.name} to chocolate catalog! 🍫`);
+  const addProduct = async (productData) => {
+    try {
+      const res = await api.adminCreateProduct(productData);
+      if (res.success) {
+        addToast('New chocolate variety created!');
+        fetchProducts();
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+    }
   };
 
-  const editProduct = (productId, updatedFields) => {
-    setProducts((prev) =>
-      (Array.isArray(prev) ? prev : []).map((p) =>
-        p.id === productId ? { ...p, ...updatedFields } : p
-      )
-    );
-    addToast('Chocolate details updated successfully!');
+  const editProduct = async (productId, updatedFields) => {
+    try {
+      const res = await api.adminUpdateProduct(productId, updatedFields);
+      if (res.success) {
+        addToast('Product updated successfully!');
+        fetchProducts();
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+    }
   };
 
-  const removeProduct = (productId) => {
-    setProducts((prev) => (Array.isArray(prev) ? prev : []).filter((p) => p.id !== productId));
-    addToast('Product removed from catalog', 'warning');
+  const removeProduct = async (productId) => {
+    try {
+      const res = await api.adminDeleteProduct(productId);
+      if (res.success) {
+        addToast('Product removed from catalog', 'info');
+        fetchProducts();
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+    }
   };
 
-  const updateProductPrice = (productId, piecePrice, boxPrice) => {
-    setProducts((prev) =>
-      (Array.isArray(prev) ? prev : []).map((p) =>
-        p.id === productId ? { ...p, piecePrice: Number(piecePrice), boxPrice: Number(boxPrice) } : p
-      )
-    );
-    addToast('Prices updated!');
+  const toggleProductAvailability = async (productId) => {
+    try {
+      const res = await api.adminToggleStock(productId);
+      if (res.success) {
+        addToast(res.message, 'info');
+        fetchProducts();
+      }
+    } catch (err) {
+      addToast(err.message, 'warning');
+    }
   };
 
-  const toggleProductAvailability = (productId) => {
-    setProducts((prev) =>
-      (Array.isArray(prev) ? prev : []).map((p) =>
-        p.id === productId ? { ...p, isAvailable: !p.isAvailable } : p
-      )
-    );
-  };
-
-  // 7. Dynamic Revenue Calculation (derived ONLY from paid/completed orders!)
-  const completedPaidOrders = (Array.isArray(orders) ? orders : []).filter(
-    (o) =>
-      o.orderStatus === 'Delivered' ||
-      (o.paymentMethod === 'UPI' && o.paymentStatus.includes('Paid'))
-  );
-
-  const totalDemoRevenue = completedPaidOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
-  const avgOrderValue = completedPaidOrders.length > 0 ? Math.round(totalDemoRevenue / completedPaidOrders.length) : 0;
-
-  // Reset to default demo data
-  const resetDemoData = () => {
-    setProducts(INITIAL_PRODUCTS);
-    setOrders(INITIAL_ORDERS);
-    setRegisteredCustomers(SEED_CUSTOMERS);
-    setShopSettings(DEFAULT_SETTINGS);
-    setCustomerLoginCount(14);
-    localStorage.clear();
-    addToast('Demo database restored to default products & orders!', 'info');
+  const updateProductPrice = async (productId, piecePrice, boxPrice) => {
+    return editProduct(productId, { piecePrice: Number(piecePrice), boxPrice: Number(boxPrice) });
   };
 
   return (
@@ -613,24 +467,29 @@ export const ShopProvider = ({ children }) => {
         sessionRole,
         setSessionRole,
         currentCustomer,
-        customerLogin,
+        isAdminLoggedIn: !!adminUser,
+        adminUser,
+        isAuthChecking,
+
+        // Customer Dual-OTP Auth
+        sendCustomerOtp,
+        verifyCustomerOtp,
         customerLogout,
-        registeredCustomers,
-        customerLoginCount,
-        isAdminLoggedIn,
-        shopkeeperLogin,
+        updateCustomerProfile,
+
+        // Shopkeeper Dual-OTP Auth
+        sendAdminOtp,
+        verifyAdminOtp,
         shopkeeperLogout,
         returnToRoleSelection,
-        products: Array.isArray(products) ? products : INITIAL_PRODUCTS,
-        cart: safeCart,
-        orders: Array.isArray(orders) ? orders : INITIAL_ORDERS,
-        activeOrderId,
-        setActiveOrderId,
-        shopSettings: shopSettings || DEFAULT_SETTINGS,
-        setShopSettings,
-        toasts,
-        addToast,
-        removeToast,
+
+        // Products Catalog
+        products,
+        isProductsLoading,
+        fetchProducts,
+
+        // Cart
+        cart,
         isCartOpen,
         setIsCartOpen,
         quickViewProduct,
@@ -642,17 +501,33 @@ export const ShopProvider = ({ children }) => {
         cartSubtotal,
         cartCount,
         deliveryFee,
+
+        // Orders
+        orders: sessionRole === 'shopkeeper' ? adminOrders : customerOrders,
+        activeOrderId,
+        setActiveOrderId,
         placeOrder,
+        refreshCustomerOrders,
+
+        // Store Settings & Toasts
+        shopSettings,
+        setShopSettings,
+        saveStoreSettings,
+        toasts,
+        addToast,
+        removeToast,
+
+        // Admin Management
+        adminStats,
+        adminOrders,
+        adminCustomers,
+        refreshAdminData,
         updateOrderStatus,
         addProduct,
         editProduct,
         removeProduct,
         updateProductPrice,
-        toggleProductAvailability,
-        completedPaidOrders,
-        totalDemoRevenue,
-        avgOrderValue,
-        resetDemoData
+        toggleProductAvailability
       }}
     >
       {children}

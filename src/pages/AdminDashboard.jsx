@@ -35,8 +35,9 @@ export const AdminDashboard = () => {
   const {
     orders,
     products,
-    registeredCustomers,
-    customerLoginCount,
+    adminCustomers,
+    adminStats,
+    refreshAdminData,
     shopkeeperLogout,
     updateOrderStatus,
     addProduct,
@@ -46,10 +47,7 @@ export const AdminDashboard = () => {
     toggleProductAvailability,
     shopSettings,
     setShopSettings,
-    completedPaidOrders,
-    totalDemoRevenue,
-    avgOrderValue,
-    resetDemoData,
+    saveStoreSettings,
     addToast
   } = useShop();
 
@@ -83,22 +81,30 @@ export const AdminDashboard = () => {
   // WhatsApp Preview Modal for any order
   const [whatsappOrderPreview, setWhatsappOrderPreview] = useState(null);
 
-  // Derived stats
-  const totalOrders = orders.length;
-  const pendingOrders = orders.filter(
-    (o) => o.orderStatus === 'Order Placed' || o.orderStatus === 'Order Confirmed' || o.orderStatus === 'Preparing Your Chocolates'
-  ).length;
-  const completedOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
+  // Stats from live backend
+  const totalOrders = adminStats?.totalOrders ?? (orders || []).length;
+  const pendingOrders = adminStats?.pendingOrders ?? 0;
+  const completedOrders = adminStats?.deliveredOrders ?? 0;
+  const totalRevenue = adminStats?.totalRevenue ?? 0;
+  const totalCustomers = adminStats?.totalCustomers ?? (adminCustomers || []).length;
+  const confirmedOrders = adminStats?.confirmedOrders ?? 0;
 
   // Filtered orders
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = (orders || []).filter((o) => {
     const matchesStatus = orderStatusFilter === 'All' || o.orderStatus === orderStatusFilter;
     const matchesSearch =
-      o.id.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      (o.orderNumber || o.id || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
       (o.customer?.name || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
       (o.customer?.phone || '').includes(orderSearch);
     return matchesStatus && matchesSearch;
   });
+
+  // Filtered paid orders strictly for Revenue Analytics
+  const completedPaidOrders = (orders || []).filter(
+    (o) => o.paymentStatus === 'Paid' || (o.paymentMethod === 'Cash on Delivery' && o.orderStatus === 'Delivered')
+  );
+  const totalPaidRevenue = adminStats?.totalRevenue ?? completedPaidOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+  const avgOrderValue = completedPaidOrders.length > 0 ? Math.round(totalPaidRevenue / completedPaidOrders.length) : 0;
 
   // Handle Add Product Submit
   const handleAddSubmit = (e) => {
@@ -197,7 +203,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
             {[
               { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
               { id: 'orders', label: `All Orders (${orders.length})`, icon: Package },
-              { id: 'customers', label: `Customers (${registeredCustomers.length})`, icon: Users },
+              { id: 'customers', label: `Customers (${(adminCustomers || []).length})`, icon: Users },
               { id: 'products', label: `Products (${products.length})`, icon: Edit2 },
               { id: 'revenue', label: 'Revenue Analytics', icon: DollarSign },
               { id: 'settings', label: 'Store Settings', icon: Settings },
@@ -225,12 +231,12 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         {/* Sidebar Footer & Actions */}
         <div className="pt-6 border-t border-[#421d10] space-y-3">
           <button
-            onClick={resetDemoData}
+            onClick={refreshAdminData}
             className="w-full py-2.5 px-3 rounded-xl bg-[#3c1b11] hover:bg-[#4a2114] text-gold-300 text-xs font-bold flex items-center justify-center gap-1.5 transition"
-            title="Reset demo orders, products & customer counts"
+            title="Refresh live orders, customer records, and revenue metrics"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset Demo Data</span>
+            <span>Refresh Store Data</span>
           </button>
 
           <button
@@ -238,7 +244,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
             className="w-full py-2.5 px-3 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-200 text-xs font-bold flex items-center justify-center gap-1.5 border border-red-900 transition"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Logout to Main Screen</span>
+            <span>Logout Owner Session</span>
           </button>
         </div>
       </aside>
@@ -261,11 +267,11 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 Shopkeeper Dashboard Overview
               </h1>
               <p className="text-xs text-stone-400 mt-0.5">
-                Monitor customer registrations, order fulfillments, and completed revenue.
+                Real database analytics: customer registrations, live order pipeline, and collected revenue.
               </p>
             </div>
 
-            {/* 6 KEY STATISTICS CARDS (Section 9 Requirement) */}
+            {/* 6 KEY STATISTICS CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               
               {/* Stat 1: Registered Customers */}
@@ -274,20 +280,20 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   Registered Customers
                 </span>
                 <div className="font-serif text-2xl font-bold text-white">
-                  {registeredCustomers.length}
+                  {totalCustomers}
                 </div>
-                <span className="text-[10px] text-emerald-400 font-semibold block">Unique Profiles</span>
+                <span className="text-[10px] text-emerald-400 font-semibold block">Unique Accounts</span>
               </div>
 
-              {/* Stat 2: Total Customer Logins */}
+              {/* Stat 2: Confirmed Orders */}
               <div className="bg-[#2b130a] rounded-2xl p-4 border border-[#421d10] space-y-1">
                 <span className="text-[10px] font-bold text-caramel-400 uppercase tracking-wider">
-                  Customer Logins
+                  Confirmed Orders
                 </span>
                 <div className="font-serif text-2xl font-bold text-caramel-300">
-                  {customerLoginCount}
+                  {confirmedOrders}
                 </div>
-                <span className="text-[10px] text-stone-400 font-semibold block">Login Events</span>
+                <span className="text-[10px] text-stone-400 font-semibold block">Verified Orders</span>
               </div>
 
               {/* Stat 3: Total Orders */}
@@ -298,7 +304,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 <div className="font-serif text-2xl font-bold text-white">
                   {totalOrders}
                 </div>
-                <span className="text-[10px] text-stone-400 font-semibold block">Customer Baskets</span>
+                <span className="text-[10px] text-stone-400 font-semibold block">Database Records</span>
               </div>
 
               {/* Stat 4: Pending Orders */}
@@ -309,13 +315,13 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 <div className="font-serif text-2xl font-bold text-amber-300">
                   {pendingOrders}
                 </div>
-                <span className="text-[10px] text-amber-500 font-semibold block">Needs Preparation</span>
+                <span className="text-[10px] text-amber-500 font-semibold block">Needs Kitchen Prep</span>
               </div>
 
               {/* Stat 5: Completed Orders */}
               <div className="bg-[#2b130a] rounded-2xl p-4 border border-[#421d10] space-y-1">
                 <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                  Completed Orders
+                  Delivered Orders
                 </span>
                 <div className="font-serif text-2xl font-bold text-emerald-300">
                   {completedOrders}
@@ -323,15 +329,15 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 <span className="text-[10px] text-emerald-500 font-semibold block">Delivered Fresh</span>
               </div>
 
-              {/* Stat 6: Total Revenue (Calculated ONLY from paid/completed orders!) */}
+              {/* Stat 6: Total Collected Revenue */}
               <div className="bg-[#2b130a] rounded-2xl p-4 border border-[#421d10] space-y-1">
                 <span className="text-[10px] font-bold text-gold-400 uppercase tracking-wider">
-                  Completed Revenue
+                  Collected Revenue
                 </span>
                 <div className="font-serif text-2xl font-bold text-gold-300">
-                  ₹{totalDemoRevenue}
+                  ₹{totalRevenue}
                 </div>
-                <span className="text-[10px] text-stone-400 font-semibold block">Paid Orders Only</span>
+                <span className="text-[10px] text-emerald-400 font-semibold block">Paid & Completed Only</span>
               </div>
 
             </div>
@@ -582,7 +588,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               <div className="bg-[#2b130a] p-5 rounded-2xl border border-[#421d10] flex items-center justify-between">
                 <div>
                   <div className="text-xs text-stone-400 font-bold uppercase">Total Unique Registered Customers</div>
-                  <div className="font-serif text-3xl font-bold text-white mt-1">{registeredCustomers.length}</div>
+                  <div className="font-serif text-3xl font-bold text-white mt-1">{totalCustomers}</div>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-[#3c1b11] text-gold-400 flex items-center justify-center text-2xl">
                   👥
@@ -591,46 +597,62 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
 
               <div className="bg-[#2b130a] p-5 rounded-2xl border border-[#421d10] flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-caramel-400 font-bold uppercase">Customer Login Events (Visits)</div>
-                  <div className="font-serif text-3xl font-bold text-caramel-300 mt-1">{customerLoginCount}</div>
+                  <div className="text-xs text-caramel-400 font-bold uppercase">Total Verified Orders</div>
+                  <div className="font-serif text-3xl font-bold text-caramel-300 mt-1">{totalOrders}</div>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-[#3c1b11] text-caramel-400 flex items-center justify-center text-2xl">
-                  🚪
+                  📦
                 </div>
               </div>
             </div>
 
             {/* Customers Table */}
             <div className="bg-[#2b130a] rounded-3xl p-6 border border-[#421d10] shadow-xl overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-[#421d10] text-stone-400 uppercase tracking-wider text-[11px]">
-                    <th className="pb-3">Customer Name</th>
-                    <th className="pb-3">Email Address</th>
-                    <th className="pb-3">Mobile Number</th>
-                    <th className="pb-3">Registration Date</th>
-                    <th className="pb-3">Orders Placed</th>
-                    <th className="pb-3">Recorded Delivery City</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#35180d]">
-                  {registeredCustomers.map((cust) => (
-                    <tr key={cust.id} className="hover:bg-[#35180d]/60">
-                      <td className="py-3.5 font-bold text-white flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-full bg-[#3c1b11] text-gold-400 text-xs flex items-center justify-center font-bold">
-                          {cust.name.charAt(0)}
-                        </span>
-                        <span>{cust.name}</span>
-                      </td>
-                      <td className="py-3.5 text-stone-300">{cust.email}</td>
-                      <td className="py-3.5 text-stone-300">+91 {cust.phone}</td>
-                      <td className="py-3.5 text-stone-400">{cust.registeredDate}</td>
-                      <td className="py-3.5 font-bold text-gold-300">{cust.ordersCount || 0} orders</td>
-                      <td className="py-3.5 text-stone-300">{cust.address?.city || 'Pune'}</td>
+              {(adminCustomers || []).length === 0 ? (
+                <div className="py-12 text-center text-stone-400 text-xs space-y-2">
+                  <div className="text-3xl">👥</div>
+                  <p className="font-semibold text-white">No Registered Customer Accounts Yet</p>
+                  <p className="text-[11px] text-stone-500 max-w-sm mx-auto">
+                    When customers register via Email & Mobile Dual-OTP and place chocolate orders, their verified profiles appear here.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#421d10] text-stone-400 uppercase tracking-wider text-[11px]">
+                      <th className="pb-3">Customer Name</th>
+                      <th className="pb-3">Email Address</th>
+                      <th className="pb-3">Mobile Number</th>
+                      <th className="pb-3">Registration Date</th>
+                      <th className="pb-3">Orders Placed</th>
+                      <th className="pb-3">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#35180d]">
+                    {adminCustomers.map((cust) => (
+                      <tr key={cust.id} className="hover:bg-[#35180d]/60">
+                        <td className="py-3.5 font-bold text-white flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-full bg-[#3c1b11] text-gold-400 text-xs flex items-center justify-center font-bold">
+                            {(cust.name || 'C').charAt(0)}
+                          </span>
+                          <span>{cust.name}</span>
+                        </td>
+                        <td className="py-3.5 text-stone-300">{cust.email}</td>
+                        <td className="py-3.5 text-stone-300">{cust.phone}</td>
+                        <td className="py-3.5 text-stone-400">
+                          {cust.createdAt ? new Date(cust.createdAt).toLocaleDateString() : 'Active'}
+                        </td>
+                        <td className="py-3.5 font-bold text-gold-300">{cust.ordersCount || 0} orders</td>
+                        <td className="py-3.5">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                            Verified
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
           </div>
@@ -743,28 +765,28 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
             
             <div className="pb-3 border-b border-[#421d10]">
               <div className="text-xs font-bold uppercase tracking-wider text-caramel-400">
-                Financial Performance (Demo Data)
+                Financial Performance (Production Ledger)
               </div>
               <h2 className="font-serif text-2xl font-bold text-white mt-1">
                 Revenue & Sales Analytics
               </h2>
               <p className="text-xs text-stone-400">
-                Calculated strictly from completed and verified customer payments.
+                Calculated strictly from completed and verified customer transactions (Paid online + Delivered COD).
               </p>
             </div>
 
             {/* Revenue Highlights */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-[#2b130a] p-6 rounded-3xl border border-[#421d10] space-y-1">
-                <span className="text-xs text-stone-400 uppercase font-bold">Total Completed Revenue</span>
-                <div className="font-serif text-3xl font-bold text-gold-300">₹{totalDemoRevenue}</div>
-                <p className="text-[11px] text-emerald-400 font-medium">Excludes pending / unpaid demo orders</p>
+                <span className="text-xs text-stone-400 uppercase font-bold">Total Collected Revenue</span>
+                <div className="font-serif text-3xl font-bold text-gold-300">₹{totalPaidRevenue}</div>
+                <p className="text-[11px] text-emerald-400 font-medium">Excludes pending / unfulfilled COD orders</p>
               </div>
 
               <div className="bg-[#2b130a] p-6 rounded-3xl border border-[#421d10] space-y-1">
                 <span className="text-xs text-stone-400 uppercase font-bold">Paid Orders Fulfilled</span>
                 <div className="font-serif text-3xl font-bold text-white">{completedPaidOrders.length}</div>
-                <p className="text-[11px] text-stone-400">Delivered or Verified UPI</p>
+                <p className="text-[11px] text-stone-400">Verified Razorpay UPI / Card or Delivered COD</p>
               </div>
 
               <div className="bg-[#2b130a] p-6 rounded-3xl border border-[#421d10] space-y-1">
@@ -777,37 +799,43 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
             {/* Sales Breakdown by Payment Type */}
             <div className="bg-[#2b130a] p-6 sm:p-8 rounded-3xl border border-[#421d10] space-y-4">
               <h3 className="font-serif text-lg font-bold text-white">
-                Completed Sales Log (Demo Verification)
+                Completed Sales Transactions (Paid & Verified)
               </h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-[#421d10] text-stone-400 uppercase tracking-wider text-[11px]">
-                      <th className="pb-3">Order ID</th>
-                      <th className="pb-3">Customer</th>
-                      <th className="pb-3">Date</th>
-                      <th className="pb-3">Payment Method</th>
-                      <th className="pb-3">Amount</th>
-                      <th className="pb-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#35180d]">
-                    {completedPaidOrders.map((ord) => (
-                      <tr key={ord.id} className="hover:bg-[#35180d]/60">
-                        <td className="py-3 font-mono font-bold text-gold-300">#{ord.id}</td>
-                        <td className="py-3 font-medium text-white">{ord.customer?.name}</td>
-                        <td className="py-3 text-stone-400">{new Date(ord.createdAt).toLocaleDateString()}</td>
-                        <td className="py-3 text-stone-300">{ord.paymentMethod}</td>
-                        <td className="py-3 font-bold text-white">₹{ord.grandTotal}</td>
-                        <td className="py-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                            {ord.orderStatus}
-                          </span>
-                        </td>
+                {completedPaidOrders.length === 0 ? (
+                  <div className="py-8 text-center text-stone-400 text-xs">
+                    No verified completed transactions recorded in database yet.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#421d10] text-stone-400 uppercase tracking-wider text-[11px]">
+                        <th className="pb-3">Order ID</th>
+                        <th className="pb-3">Customer</th>
+                        <th className="pb-3">Date</th>
+                        <th className="pb-3">Payment Method</th>
+                        <th className="pb-3">Amount</th>
+                        <th className="pb-3">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#35180d]">
+                      {completedPaidOrders.map((ord) => (
+                        <tr key={ord.id} className="hover:bg-[#35180d]/60">
+                          <td className="py-3 font-mono font-bold text-gold-300">#{ord.id}</td>
+                          <td className="py-3 font-medium text-white">{ord.customer?.name}</td>
+                          <td className="py-3 text-stone-400">{new Date(ord.createdAt).toLocaleDateString()}</td>
+                          <td className="py-3 text-stone-300">{ord.paymentMethod}</td>
+                          <td className="py-3 font-bold text-white">₹{ord.grandTotal}</td>
+                          <td className="py-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                              {ord.orderStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
 
@@ -883,8 +911,10 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => addToast('Settings saved successfully!')}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 text-white font-bold text-xs"
+                  onClick={async () => {
+                    await saveStoreSettings(shopSettings);
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs shadow-md transition"
                 >
                   Save Store Settings
                 </button>

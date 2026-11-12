@@ -1,57 +1,129 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
-import { ShoppingBag, Store, ArrowRight, Sparkles, User, Mail, Phone, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Store, ArrowRight, User, Mail, Phone, KeyRound, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const FirstScreen = () => {
-  const { customerLogin, shopkeeperLogin, addToast } = useShop();
+  const { sendCustomerOtp, verifyCustomerOtp, sendAdminOtp, verifyAdminOtp, addToast } = useShop();
 
-  // Mode: null (showing the two cards), 'customer-form', 'shopkeeper-form'
-  const [activeForm, setActiveForm] = useState(null);
+  // Mode: null | 'customer-step1' | 'customer-step2' | 'shopkeeper-step1' | 'shopkeeper-step2'
+  const [activeView, setActiveView] = useState(null);
 
   // Customer Form State
   const [custName, setCustName] = useState('');
   const [custEmail, setCustEmail] = useState('');
   const [custPhone, setCustPhone] = useState('');
+  const [custEmailOtp, setCustEmailOtp] = useState('');
+  const [custMobileOtp, setCustMobileOtp] = useState('');
 
   // Shopkeeper Form State
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [shopkeeperError, setShopkeeperError] = useState('');
+  const [adminEmail, setAdminEmail] = useState('zorashop.homemade@gmail.com');
+  const [adminEmailOtp, setAdminEmailOtp] = useState('');
+  const [adminMobileOtp, setAdminMobileOtp] = useState('');
 
-  // Auto fill handlers for demonstration ease
-  const handleAutoFillCustomer = () => {
-    setCustName('Priya Sharma');
-    setCustEmail('priya.sharma@gmail.com');
-    setCustPhone('9823456789');
-  };
+  // Loading & status states
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successInfo, setSuccessInfo] = useState('');
+  const [countdown, setCountdown] = useState(0);
 
-  const handleAutoFillShopkeeper = () => {
-    setAdminEmail('admin@zorashop.demo');
-    setAdminPassword('demo123');
-    setShopkeeperError('');
-  };
+  // Timer countdown
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setInterval(() => setCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown]);
 
-  const handleCustomerSubmit = (e) => {
+  // Handle Customer Step 1: Send Dual OTPs
+  const handleCustomerSendOtp = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     if (!custName.trim() || !custEmail.trim() || !custPhone.trim()) {
-      addToast('Please fill all required customer fields', 'warning');
+      setErrorMessage('Please fill in your Full Name, Email, and Mobile number.');
       return;
     }
-    customerLogin({
-      name: custName,
-      email: custEmail,
-      phone: custPhone
-    });
+    setIsLoading(true);
+    try {
+      await sendCustomerOtp({
+        name: custName.trim(),
+        email: custEmail.trim(),
+        phone: custPhone.trim()
+      });
+      setActiveView('customer-step2');
+      setCountdown(300); // 5 minutes
+      setSuccessInfo(`Verification codes dispatched to ${custEmail.trim()} and your mobile.`);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to dispatch verification codes.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleShopkeeperSubmit = (e) => {
+  // Handle Customer Step 2: Verify Dual OTPs
+  const handleCustomerVerify = async (e) => {
     e.preventDefault();
-    const success = shopkeeperLogin(adminEmail, adminPassword);
-    if (!success) {
-      setShopkeeperError('Invalid demo credentials. Use admin@zorashop.demo / demo123');
-    } else {
-      setShopkeeperError('');
+    setErrorMessage('');
+    if (!custEmailOtp.trim() || !custMobileOtp.trim()) {
+      setErrorMessage('Both Email OTP and Mobile OTP are required to authenticate.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await verifyCustomerOtp({
+        name: custName.trim(),
+        email: custEmail.trim(),
+        phone: custPhone.trim(),
+        emailOtp: custEmailOtp.trim(),
+        mobileOtp: custMobileOtp.trim()
+      });
+    } catch (err) {
+      setErrorMessage(err.message || 'Verification failed. Please check both OTP codes.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Shopkeeper Step 1: Send Dual OTPs
+  const handleAdminSendOtp = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    if (!adminEmail.trim()) {
+      setErrorMessage('Please enter registered Owner Email address.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await sendAdminOtp({ email: adminEmail.trim() });
+      setActiveView('shopkeeper-step2');
+      setCountdown(300);
+      setSuccessInfo(`Owner verification codes sent to ${adminEmail.trim()} and registered mobile.`);
+    } catch (err) {
+      setErrorMessage(err.message || 'Owner authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Shopkeeper Step 2: Verify Dual OTPs
+  const handleAdminVerify = async (e) => {
+    e.preventDefault();
+    setErrorMessage('');
+    if (!adminEmailOtp.trim() || !adminMobileOtp.trim()) {
+      setErrorMessage('Both Owner Email OTP and Mobile SMS OTP must be entered.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await verifyAdminOtp({
+        email: adminEmail.trim(),
+        emailOtp: adminEmailOtp.trim(),
+        mobileOtp: adminMobileOtp.trim()
+      });
+    } catch (err) {
+      setErrorMessage(err.message || 'Owner verification failed.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -64,11 +136,8 @@ export const FirstScreen = () => {
 
       <div className="w-full max-w-4xl relative z-10 space-y-8 animate-fadeIn">
         
-        {/* TOP BRAND HEADER (Matching image layout) */}
+        {/* TOP BRAND HEADER */}
         <div className="rounded-3xl bg-[#3c1b11] border-2 border-[#5a2c1b] p-6 sm:p-8 text-center text-cream-100 shadow-2xl relative overflow-hidden">
-          {/* Subtle chocolate highlight */}
-          <div className="absolute -top-12 -left-12 w-40 h-40 bg-gold-500/10 rounded-full blur-2xl"></div>
-
           <div className="inline-flex items-center gap-2 mb-2">
             <span className="text-3xl select-none">🍫</span>
             <h1 className="font-serif text-3xl sm:text-5xl font-extrabold tracking-wider text-white">
@@ -79,14 +148,14 @@ export const FirstScreen = () => {
             "Sweetness in Every Bite!"
           </p>
           <div className="mt-3 inline-block px-4 py-1 rounded-full bg-[#271008] border border-gold-500/30 text-gold-300 text-xs sm:text-sm font-semibold tracking-wide">
-            Welcome! Choose your experience
+            Choose Your Experience
           </div>
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════════════
             VIEW 1: TWO LARGE SIDE-BY-SIDE CARDS (CUSTOMER vs SHOPKEEPER)
         ══════════════════════════════════════════════════════════════════════════ */}
-        {activeForm === null && (
+        {activeView === null && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 animate-fadeIn">
             
             {/* CARD 1: CUSTOMER */}
@@ -100,7 +169,7 @@ export const FirstScreen = () => {
                     CUSTOMER
                   </h2>
                   <p className="text-stone-700 text-xs sm:text-sm mt-1 max-w-xs font-medium">
-                    Shop delicious chocolates, choose piece or 250g packaging, and enjoy fresh homemade delivery.
+                    Shop delicious handcrafted chocolates, select piece or 250g packaging, and enjoy fresh homemade delivery.
                   </p>
                 </div>
               </div>
@@ -108,10 +177,13 @@ export const FirstScreen = () => {
               <div className="w-full pt-8">
                 <button
                   type="button"
-                  onClick={() => setActiveForm('customer-form')}
+                  onClick={() => {
+                    setErrorMessage('');
+                    setActiveView('customer-step1');
+                  }}
                   className="w-full py-4 px-6 rounded-2xl bg-[#3c1b11] hover:bg-[#250f08] text-gold-300 hover:text-white font-bold text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-2 group-hover:shadow-lg"
                 >
-                  <span>Continue as Customer</span>
+                  <span>Customer Login</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -128,7 +200,7 @@ export const FirstScreen = () => {
                     SHOPKEEPER
                   </h2>
                   <p className="text-stone-700 text-xs sm:text-sm mt-1 max-w-xs font-medium">
-                    Manage customer orders, adjust chocolate prices, track store revenue and customer analytics.
+                    Secure owner management portal. Manage orders, adjust chocolate prices, track real revenue, and view customer records.
                   </p>
                 </div>
               </div>
@@ -136,7 +208,10 @@ export const FirstScreen = () => {
               <div className="w-full pt-8">
                 <button
                   type="button"
-                  onClick={() => setActiveForm('shopkeeper-form')}
+                  onClick={() => {
+                    setErrorMessage('');
+                    setActiveView('shopkeeper-step1');
+                  }}
                   className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-sm tracking-wide shadow-md transition-all flex items-center justify-center gap-2 group-hover:shadow-lg"
                 >
                   <ShieldCheck className="w-4 h-4" />
@@ -149,11 +224,10 @@ export const FirstScreen = () => {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 2: CUSTOMER SIMPLE LOGIN / REGISTRATION FORM
+            VIEW 2: CUSTOMER STEP 1 — ENTER DETAILS TO REQUEST DUAL OTPS
         ══════════════════════════════════════════════════════════════════════════ */}
-        {activeForm === 'customer-form' && (
+        {activeView === 'customer-step1' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
-            
             <div className="text-center space-y-1">
               <div className="w-14 h-14 mx-auto rounded-2xl bg-[#3c1b11] flex items-center justify-center text-2xl text-gold-400 shadow-md">
                 <ShoppingBag className="w-7 h-7" />
@@ -162,26 +236,21 @@ export const FirstScreen = () => {
                 Customer Registration & Login
               </h2>
               <p className="text-xs text-stone-600">
-                Enter your details to start exploring our fresh homemade chocolate collection.
+                Enter your details to receive Email & Mobile verification codes.
               </p>
             </div>
 
-            {/* Quick Demo Auto-fill Helper */}
-            <div className="p-3 rounded-2xl bg-white/80 border border-caramel-300 flex items-center justify-between text-xs text-chocolate-900">
-              <span className="text-stone-600 font-medium">Demo Profile:</span>
-              <button
-                type="button"
-                onClick={handleAutoFillCustomer}
-                className="font-bold underline text-caramel-700 hover:text-caramel-900"
-              >
-                1-Click Auto Fill (Priya Sharma)
-              </button>
-            </div>
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
-            <form onSubmit={handleCustomerSubmit} className="space-y-4">
+            <form onSubmit={handleCustomerSendOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Full Name / Username *
+                  Full Name *
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -233,15 +302,23 @@ export const FirstScreen = () => {
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-[#3c1b11] hover:bg-[#250f08] text-gold-300 hover:text-white font-bold text-xs tracking-wider uppercase shadow-md transition"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-[#3c1b11] hover:bg-[#250f08] text-gold-300 hover:text-white font-bold text-xs tracking-wider uppercase shadow-md transition flex items-center justify-center gap-2"
                 >
-                  Continue to Chocolates →
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Sending OTPs...</span>
+                    </>
+                  ) : (
+                    <span>Send Verification OTPs →</span>
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setActiveForm(null)}
-                  className="w-full py-2.5 text-xs font-bold text-stone-600 hover:text-chocolate-950"
+                  onClick={() => setActiveView(null)}
+                  className="w-full py-2 text-xs font-bold text-stone-600 hover:text-chocolate-950"
                 >
                   ← Back to Options
                 </button>
@@ -249,51 +326,147 @@ export const FirstScreen = () => {
             </form>
 
             <div className="text-[11px] text-center text-stone-500">
-              🔒 No complicated registration • Instant demo access
+              🔒 Real Dual Verification: Separate OTPs will be delivered to your Email and Mobile.
             </div>
           </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 3: SHOPKEEPER SECURE LOGIN FORM
+            VIEW 3: CUSTOMER STEP 2 — ENTER BOTH EMAIL OTP AND MOBILE OTP
         ══════════════════════════════════════════════════════════════════════════ */}
-        {activeForm === 'shopkeeper-form' && (
+        {activeView === 'customer-step2' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
-            
             <div className="text-center space-y-1">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#3c1b11] flex items-center justify-center text-2xl text-gold-400 shadow-md">
-                <Store className="w-7 h-7" />
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-900 flex items-center justify-center text-2xl text-emerald-300 shadow-md">
+                <KeyRound className="w-7 h-7" />
               </div>
               <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
-                Shopkeeper Admin Login
+                Verify Both OTPs
               </h2>
               <p className="text-xs text-stone-600">
-                Authorized management console for ZORA SHOP.
+                Codes sent to <strong>{custEmail}</strong> & <strong>{custPhone}</strong>
               </p>
             </div>
 
-            {/* Configurable Demo Credentials Box */}
-            <div className="p-3.5 rounded-2xl bg-amber-100/80 border border-amber-300 text-xs text-amber-950 space-y-1.5">
-              <div className="flex items-center justify-between font-bold">
-                <span>Default Demo Credentials:</span>
-                <button
-                  type="button"
-                  onClick={handleAutoFillShopkeeper}
-                  className="underline text-caramel-800 hover:text-caramel-950 font-bold"
-                >
-                  Auto Fill
-                </button>
+            {successInfo && (
+              <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{successInfo}</span>
               </div>
-              <div className="font-mono text-[11px] bg-white/90 p-2 rounded-xl space-y-0.5">
-                <p>Email: <strong>admin@zorashop.demo</strong></p>
-                <p>Password: <strong>demo123</strong></p>
-              </div>
-            </div>
+            )}
 
-            <form onSubmit={handleShopkeeperSubmit} className="space-y-4">
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCustomerVerify} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Shopkeeper Email *
+                  1. Email OTP Code *
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={custEmailOtp}
+                    onChange={(e) => setCustEmailOtp(e.target.value)}
+                    placeholder="Enter 6-digit Email OTP"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
+                  2. Mobile SMS OTP Code *
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={custMobileOtp}
+                    onChange={(e) => setCustMobileOtp(e.target.value)}
+                    placeholder="Enter 6-digit Mobile OTP"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
+                <span>⏱️ Valid: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
+                <button
+                  type="button"
+                  disabled={countdown > 0 || isLoading}
+                  onClick={handleCustomerSendOtp}
+                  className={`font-bold ${countdown > 0 ? 'text-stone-400 cursor-not-allowed' : 'text-caramel-700 hover:underline'}`}
+                >
+                  Resend OTPs
+                </button>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs tracking-wider uppercase shadow-md transition flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Verifying Codes...</span>
+                    </>
+                  ) : (
+                    <span>Verify & Start Shopping →</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveView('customer-step1')}
+                  className="w-full py-2 text-xs font-bold text-stone-600 hover:text-chocolate-950"
+                >
+                  ← Edit Contact Details
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════════════════════
+            VIEW 4: SHOPKEEPER STEP 1 — OWNER EMAIL
+        ══════════════════════════════════════════════════════════════════════════ */}
+        {activeView === 'shopkeeper-step1' && (
+          <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
+            <div className="text-center space-y-1">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#3c1b11] flex items-center justify-center text-2xl text-gold-400 shadow-md">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
+                Shopkeeper Owner Portal
+              </h2>
+              <p className="text-xs text-stone-600">
+                Protected owner management console. Only authorized emails can access.
+              </p>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminSendOtp} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
+                  Registered Owner Email *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -302,55 +475,37 @@ export const FirstScreen = () => {
                     required
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="admin@zorashop.demo"
+                    placeholder="zorashop.homemade@gmail.com"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-xs text-chocolate-950 font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Password *
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white border border-cream-300 text-xs text-chocolate-950 font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+              <div className="p-3 rounded-xl bg-amber-100/90 border border-amber-300 text-[11px] text-amber-950 space-y-1">
+                <p className="font-bold">🔐 Real Owner Authentication:</p>
+                <p>A separate Email OTP and Mobile SMS OTP will be generated on the backend and dispatched to the authorized store owner.</p>
               </div>
-
-              {shopkeeperError && (
-                <p className="text-xs text-red-600 font-semibold text-center">
-                  {shopkeeperError}
-                </p>
-              )}
 
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs tracking-wider uppercase shadow-md transition"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs tracking-wider uppercase shadow-md transition flex items-center justify-center gap-2"
                 >
-                  Enter Dashboard →
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Sending Owner OTPs...</span>
+                    </>
+                  ) : (
+                    <span>Send Owner Verification Codes →</span>
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setActiveForm(null)}
-                  className="w-full py-2.5 text-xs font-bold text-stone-600 hover:text-chocolate-950"
+                  onClick={() => setActiveView(null)}
+                  className="w-full py-2 text-xs font-bold text-stone-600 hover:text-chocolate-950"
                 >
                   ← Back to Options
                 </button>
@@ -359,8 +514,116 @@ export const FirstScreen = () => {
           </div>
         )}
 
+        {/* ══════════════════════════════════════════════════════════════════════════
+            VIEW 5: SHOPKEEPER STEP 2 — ENTER DUAL OWNER OTPS
+        ══════════════════════════════════════════════════════════════════════════ */}
+        {activeView === 'shopkeeper-step2' && (
+          <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
+            <div className="text-center space-y-1">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#3c1b11] flex items-center justify-center text-2xl text-gold-400 shadow-md">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
+                Owner Dual Verification
+              </h2>
+              <p className="text-xs text-stone-600">
+                Codes sent to <strong>{adminEmail}</strong>
+              </p>
+            </div>
+
+            {successInfo && (
+              <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{successInfo}</span>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAdminVerify} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
+                  1. Owner Email OTP Code *
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={adminEmailOtp}
+                    onChange={(e) => setAdminEmailOtp(e.target.value)}
+                    placeholder="Enter 6-digit Email OTP"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
+                  2. Owner Mobile SMS OTP Code *
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={adminMobileOtp}
+                    onChange={(e) => setAdminMobileOtp(e.target.value)}
+                    placeholder="Enter 6-digit Mobile OTP"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
+                <span>⏱️ Valid: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
+                <button
+                  type="button"
+                  disabled={countdown > 0 || isLoading}
+                  onClick={handleAdminSendOtp}
+                  className={`font-bold ${countdown > 0 ? 'text-stone-400 cursor-not-allowed' : 'text-caramel-700 hover:underline'}`}
+                >
+                  Resend Codes
+                </button>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs tracking-wider uppercase shadow-md transition flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Verifying Owner Codes...</span>
+                    </>
+                  ) : (
+                    <span>Verify & Access Owner Dashboard →</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveView('shopkeeper-step1')}
+                  className="w-full py-2 text-xs font-bold text-stone-600 hover:text-chocolate-950"
+                >
+                  ← Edit Email Address
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         <div className="text-center text-xs text-stone-400">
-          ZORA SHOP Homemade Chocolates • Simple, Clean & Responsive Prototype
+          ZORA SHOP Homemade Chocolates • Production E-Commerce Platform
         </div>
 
       </div>
@@ -368,4 +631,3 @@ export const FirstScreen = () => {
     </div>
   );
 };
-

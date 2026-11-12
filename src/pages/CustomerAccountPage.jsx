@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import {
@@ -16,14 +16,15 @@ import {
   Gift,
   ArrowRight,
   ShieldCheck,
-  Heart
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 export const CustomerAccountPage = () => {
   const {
     currentCustomer,
-    customerLogin,
-    customerRegister,
+    sendCustomerOtp,
+    verifyCustomerOtp,
     updateCustomerProfile,
     customerLogout,
     orders,
@@ -33,56 +34,76 @@ export const CustomerAccountPage = () => {
 
   const navigate = useNavigate();
 
-  // Mode: 'login' or 'register'
-  const [authMode, setAuthMode] = useState('login');
+  // Dual OTP Auth Step: 1 = Enter Details, 2 = Verify Email & Mobile OTP
+  const [authStep, setAuthStep] = useState(1);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [mobileOtp, setMobileOtp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [countdown, setCountdown] = useState(0);
 
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-
-  // Register form state
-  const [regData, setRegData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    address: {
-      house: '',
-      street: '',
-      landmark: '',
-      city: 'Pune',
-      state: 'Maharashtra',
-      pincode: '411014',
-      instructions: ''
+  // Timer countdown
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setInterval(() => setCountdown((c) => c - 1), 1000);
     }
-  });
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   // Edit profile toggle
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
 
-  // Quick Demo Auto-fill
-  const handleAutoFillDemoCustomer = () => {
-    setLoginEmail('priya.sharma@example.com');
-    setLoginPassword('chocofan123');
-  };
-
-  const handleLoginSubmit = (e) => {
+  // Handle Step 1: Request Email & Mobile OTP
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
-    if (!loginEmail || !loginPassword) {
-      addToast('Please enter your email and password', 'warning');
+    setErrorMessage('');
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      setErrorMessage('Please fill in your Full Name, Email, and Mobile number.');
       return;
     }
-    customerLogin(loginEmail, loginPassword);
+    setIsLoading(true);
+    try {
+      await sendCustomerOtp({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim()
+      });
+      setAuthStep(2);
+      setCountdown(300);
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to dispatch verification codes.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  // Handle Step 2: Verify Dual OTPs
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    if (!regData.name || !regData.email || !regData.phone || !regData.address.house || !regData.address.street || !regData.address.city || !regData.address.pincode) {
-      addToast('Please fill all required profile & address fields', 'warning');
+    setErrorMessage('');
+    if (!emailOtp.trim() || !mobileOtp.trim()) {
+      setErrorMessage('Both Email OTP and Mobile OTP are required.');
       return;
     }
-    customerRegister(regData);
+    setIsLoading(true);
+    try {
+      await verifyCustomerOtp({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        emailOtp: emailOtp.trim(),
+        mobileOtp: mobileOtp.trim()
+      });
+    } catch (err) {
+      setErrorMessage(err.message || 'Verification failed. Please check both codes.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleStartEdit = () => {
@@ -115,9 +136,9 @@ export const CustomerAccountPage = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fadeIn">
       
-      {/* 1. NOT LOGGED IN VIEW: LOGIN & REGISTRATION */}
+      {/* 1. NOT LOGGED IN VIEW: DUAL OTP AUTHENTICATION */}
       {!currentCustomer ? (
-        <div className="max-w-xl mx-auto space-y-6">
+        <div className="max-w-md mx-auto space-y-6">
           
           <div className="text-center space-y-2">
             <div className="w-16 h-16 mx-auto rounded-3xl bg-chocolate-950 flex items-center justify-center text-3xl shadow-xl border border-gold-400/40">
@@ -127,56 +148,46 @@ export const CustomerAccountPage = () => {
               Customer Account Portal
             </h1>
             <p className="text-xs text-stone-500">
-              Sign in or create a customer profile to save your delivery address, track fresh chocolate batches, and earn Sweet Points!
+              Secure Dual-OTP Verification (Email + Mobile SMS). Sign in or register in seconds.
             </p>
           </div>
 
-          {/* Tab Selector */}
-          <div className="grid grid-cols-2 p-1 bg-cream-200/80 rounded-2xl border border-cream-300">
-            <button
-              type="button"
-              onClick={() => setAuthMode('login')}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                authMode === 'login'
-                  ? 'bg-chocolate-900 text-gold-300 shadow-md'
-                  : 'text-stone-700 hover:text-chocolate-950'
-              }`}
-            >
-              Customer Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode('register')}
-              className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                authMode === 'register'
-                  ? 'bg-chocolate-900 text-gold-300 shadow-md'
-                  : 'text-stone-700 hover:text-chocolate-950'
-              }`}
-            >
-              Create Account & Save Address
-            </button>
-          </div>
-
-          {/* SIGN IN FORM */}
-          {authMode === 'login' && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-cream-300 shadow-xl space-y-5 animate-fadeIn">
-              
-              {/* Quick Auto-fill banner */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between text-xs text-amber-900">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Demo customer account available:</span>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-cream-300 shadow-xl space-y-5 animate-fadeIn">
+            {authStep === 1 ? (
+              <form onSubmit={handleRequestOtp} className="space-y-4">
+                <div className="pb-3 border-b border-cream-200">
+                  <h3 className="font-serif text-lg font-bold text-chocolate-950">
+                    Enter Contact Details
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    We will send separate verification OTPs to your email and mobile.
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAutoFillDemoCustomer}
-                  className="font-bold underline text-amber-950 hover:text-caramel-700"
-                >
-                  1-Click Fill
-                </button>
-              </div>
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {errorMessage && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                    Full Name *
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Radhika Mehta"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
                     Email Address *
@@ -186,222 +197,144 @@ export const CustomerAccountPage = () => {
                     <input
                       type="email"
                       required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="priya.sharma@example.com"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400 font-medium"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="yourname@gmail.com"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Password *
+                    Mobile Number (+91) *
                   </label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      type="password"
+                      type="tel"
                       required
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400 font-medium"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="9876543210"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
                     />
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Sign In to My Account
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Sending Verification Codes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send Dual Verification Codes</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
-
-              <div className="text-center text-xs text-stone-500 pt-2">
-                Don't have an account yet?{' '}
-                <button
-                  onClick={() => setAuthMode('register')}
-                  className="text-caramel-700 font-bold hover:underline"
-                >
-                  Register here & save your address
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* REGISTRATION FORM (With Name, Email, Phone, and Complete Address) */}
-          {authMode === 'register' && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-cream-300 shadow-xl space-y-5 animate-fadeIn">
-              <div className="pb-3 border-b border-cream-200">
-                <h3 className="font-serif text-lg font-bold text-chocolate-950">
-                  New Customer Registration
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Your address will be automatically recorded and pre-filled at checkout!
-                </p>
-              </div>
-
-              <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                
-                {/* Personal Information */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regData.name}
-                      onChange={(e) => setRegData({ ...regData, name: e.target.value })}
-                      placeholder="e.g. Pooja Sharma"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="pb-3 border-b border-cream-200">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-lg font-bold text-chocolate-950">
+                      Verify Dual OTPs
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setAuthStep(1)}
+                      className="text-xs text-caramel-700 hover:underline font-bold"
+                    >
+                      Change Details
+                    </button>
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={regData.email}
-                      onChange={(e) => setRegData({ ...regData, email: e.target.value })}
-                      placeholder="pooja.s@example.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                      Mobile Number (+91) *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={regData.phone}
-                      onChange={(e) => setRegData({ ...regData, phone: e.target.value })}
-                      placeholder="98765 43210"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    Codes sent to <strong>{email}</strong> and <strong>+91 {phone}</strong>
+                  </p>
                 </div>
 
-                {/* Delivery Address Section */}
-                <div className="pt-3 border-t border-cream-200 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-caramel-800 uppercase tracking-wider">
-                    <MapPin className="w-3.5 h-3.5 text-caramel-600" />
-                    <span>Permanent Delivery Address (Recorded)</span>
+                {errorMessage && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>{errorMessage}</span>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
-                      Flat / House No. / Building Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regData.address.house}
-                      onChange={(e) =>
-                        setRegData({
-                          ...regData,
-                          address: { ...regData.address, house: e.target.value }
-                        })
-                      }
-                      placeholder="Flat 204, Orchid Residency"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
-                      Street / Locality / Landmark *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={regData.address.street}
-                      onChange={(e) =>
-                        setRegData({
-                          ...regData,
-                          address: { ...regData.address, street: e.target.value }
-                        })
-                      }
-                      placeholder="Near City Bakery, MG Road"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={regData.address.city}
-                        onChange={(e) =>
-                          setRegData({
-                            ...regData,
-                            address: { ...regData.address, city: e.target.value }
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
-                        State *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={regData.address.state}
-                        onChange={(e) =>
-                          setRegData({
-                            ...regData,
-                            address: { ...regData.address, state: e.target.value }
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-stone-700 uppercase mb-1">
-                        PIN *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={regData.address.pincode}
-                        onChange={(e) =>
-                          setRegData({
-                            ...regData,
-                            address: { ...regData.address, pincode: e.target.value }
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                    Email OTP (6 digits) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={emailOtp}
+                    onChange={(e) => setEmailOtp(e.target.value)}
+                    placeholder="Enter 6-digit email code"
+                    className="w-full px-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-center font-mono tracking-widest text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                  />
                 </div>
 
-                <div className="pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                    Mobile SMS OTP (6 digits) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={mobileOtp}
+                    onChange={(e) => setMobileOtp(e.target.value)}
+                    placeholder="Enter 6-digit SMS code"
+                    className="w-full px-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-center font-mono tracking-widest text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-stone-500">
+                  <span>
+                    {countdown > 0 ? (
+                      `Code expires in ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`
+                    ) : (
+                      <span className="text-red-600 font-bold">Codes expired</span>
+                    )}
+                  </span>
                   <button
-                    type="submit"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs shadow-md transition"
+                    type="button"
+                    disabled={countdown > 240 || isLoading}
+                    onClick={handleRequestOtp}
+                    className="text-caramel-700 font-bold hover:underline disabled:opacity-40"
                   >
-                    Save Profile & Register Account
+                    Resend Codes
                   </button>
                 </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Verifying Security Tokens...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Verify & Access Customer Account</span>
+                    </>
+                  )}
+                </button>
               </form>
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
       ) : (

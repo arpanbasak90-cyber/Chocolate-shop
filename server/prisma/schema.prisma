@@ -1,0 +1,230 @@
+// Prisma Schema for ZORA SHOP Production E-Commerce Platform
+// Target: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id              String      @id @default(uuid())
+  name            String
+  email           String      @unique
+  phone           String      @unique
+  isEmailVerified Boolean     @default(false)
+  isPhoneVerified Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  addresses       Address[]
+  orders          Order[]
+  cart            Cart?
+
+  @@index([email])
+  @@index([phone])
+}
+
+model AdminUser {
+  id              String      @id @default(uuid())
+  name            String
+  email           String      @unique
+  phone           String      @unique
+  role            String      @default("OWNER") // OWNER, MANAGER
+  passwordHash    String?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([email])
+}
+
+model VerificationOtp {
+  id          String      @id @default(uuid())
+  identifier  String      // Email address or Phone number
+  channel     String      // 'EMAIL' or 'SMS'
+  type        String      // 'CUSTOMER_AUTH' or 'ADMIN_AUTH'
+  otpHash     String      // Cryptographically secure hash
+  attempts    Int         @default(0)
+  expiresAt   DateTime
+  isVerified  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  @@index([identifier, channel, type])
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  slug        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+
+  products    Product[]
+}
+
+model Product {
+  id                  String      @id @default(uuid())
+  name                String
+  slug                String      @unique
+  categoryId          String?
+  category            Category?   @relation(fields: [categoryId], references: [id])
+  piecePrice          Float
+  boxPrice            Float
+  approxPiecesPer250g String?
+  tag                 String?
+  badge               String?
+  rating              Float       @default(4.9)
+  reviewsCount        Int         @default(0)
+  shortDescription    String
+  fullDescription     String?     @db.Text
+  ingredients         String?     // Stored as JSON string or text
+  dietary             String      @default("100% Pure Vegetarian")
+  shelfLife           String?
+  isAvailable         Boolean     @default(true)
+  isBestseller        Boolean     @default(false)
+  image               String
+  prepTime            String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  orderItems          OrderItem[]
+  cartItems           CartItem[]
+
+  @@index([slug])
+  @@index([categoryId])
+}
+
+model Address {
+  id           String    @id @default(uuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  house        String
+  street       String
+  landmark     String?
+  city         String
+  state        String
+  pincode      String
+  instructions String?
+  isDefault    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  orders       Order[]
+
+  @@index([customerId])
+}
+
+model Cart {
+  id         String     @id @default(uuid())
+  customerId String     @unique
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  items      CartItem[]
+}
+
+model CartItem {
+  id          String    @id @default(uuid())
+  cartId      String
+  cart        Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  packageType String    // 'piece' or 'pack250g'
+  quantity    Int       @default(1)
+  createdAt   DateTime  @default(now())
+
+  @@unique([cartId, productId, packageType])
+}
+
+model Order {
+  id            String              @id @default(uuid())
+  orderNumber   String              @unique // e.g. ZORA-XXXXXX
+  customerId    String
+  customer      Customer            @relation(fields: [customerId], references: [id])
+  addressId     String?
+  address       Address?            @relation(fields: [addressId], references: [id])
+  subtotal      Float
+  deliveryFee   Float               @default(0)
+  discount      Float               @default(0)
+  grandTotal    Float
+  paymentMethod String              // 'COD', 'RAZORPAY', 'UPI'
+  paymentStatus String              // 'PENDING', 'PAID', 'FAILED'
+  orderStatus   String              @default("Order Placed") // Order Placed, Confirmed, Preparing, Out for Delivery, Delivered, Cancelled
+  notes         String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  items         OrderItem[]
+  payments      Payment[]
+  statusHistory OrderStatusHistory[]
+
+  @@index([customerId])
+  @@index([orderNumber])
+  @@index([orderStatus])
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  name        String
+  packageType String   // 'piece' or 'pack250g'
+  packageName String   // 'Per Piece' or '250g Box'
+  price       Float
+  quantity    Int
+  total       Float
+  image       String?
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                 String    @id @default(uuid())
+  orderId            String
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  gateway            String    @default("RAZORPAY")
+  gatewayOrderId     String?
+  gatewayPaymentId   String?
+  gatewaySignature   String?
+  amount             Float
+  currency           String    @default("INR")
+  status             String    @default("PENDING") // PENDING, SUCCESS, FAILED, REFUNDED
+  rawWebhookData     String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([gatewayOrderId])
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  notes     String?
+  changedBy String?  // 'SYSTEM', 'CUSTOMER', 'OWNER'
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model StoreSettings {
+  id                    String   @id @default("default")
+  shopName              String   @default("ZORA SHOP")
+  tagline               String   @default("Sweetness in Every Bite!")
+  whatsappNumber        String   @default("+91 98980 14090")
+  contactEmail          String   @default("zorashop.homemade@gmail.com")
+  shopAddress           String   @default("Handcrafted Kitchen, Ahmedabad, Gujarat, India")
+  deliveryFeeThreshold  Float    @default(500)
+  standardDeliveryFee   Float    @default(40)
+  isCodEnabled          Boolean  @default(true)
+  isOnlinePaymentEnabled Boolean @default(true)
+  updatedAt             DateTime @updatedAt
+}

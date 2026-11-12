@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
+import { api } from '../api/client';
 import {
   Search,
   CheckCircle2,
@@ -10,28 +11,63 @@ import {
   MessageCircle,
   ExternalLink,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
 export const OrderTrackingPage = () => {
-  const { orders, activeOrderId, setActiveOrderId, updateOrderStatus, shopSettings, addToast } = useShop();
+  const { orders, activeOrderId, setActiveOrderId, updateOrderStatus, shopSettings, isAdminLoggedIn, addToast } = useShop();
   const [searchInput, setSearchInput] = useState(activeOrderId || '');
+  const [remoteOrder, setRemoteOrder] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Look up order by ID
-  const selectedOrder = orders.find(
-    (o) => o.id.toLowerCase() === searchInput.trim().toLowerCase()
+  // Look up order by ID locally or from remote search
+  const selectedOrder = remoteOrder || orders.find(
+    (o) => (o.orderNumber || o.id || '').toLowerCase() === searchInput.trim().toLowerCase()
   ) || orders.find((o) => o.id === activeOrderId) || orders[0];
 
-  const handleSearch = (e) => {
+  useEffect(() => {
+    if (activeOrderId && !remoteOrder) {
+      setSearchInput(activeOrderId);
+    }
+  }, [activeOrderId, remoteOrder]);
+
+  const handleSearch = async (e) => {
     e.preventDefault();
-    const found = orders.find(
-      (o) => o.id.toLowerCase() === searchInput.trim().toLowerCase()
+    const query = searchInput.trim();
+    if (!query) {
+      addToast('Please enter an Order Number or ID to track', 'warning');
+      return;
+    }
+
+    // 1. Check local orders first
+    const foundLocal = orders.find(
+      (o) => (o.orderNumber || o.id || '').toLowerCase() === query.toLowerCase()
     );
-    if (found) {
-      setActiveOrderId(found.id);
-      addToast(`Showing status for Order #${found.id}`);
-    } else {
-      addToast(`Order ID "${searchInput}" not found. Try #ZS-74921`, 'warning');
+    if (foundLocal) {
+      setRemoteOrder(foundLocal);
+      setActiveOrderId(foundLocal.id);
+      addToast(`Showing live tracking for Order #${foundLocal.orderNumber || foundLocal.id}`);
+      return;
+    }
+
+    // 2. Fetch from backend tracking API
+    setIsSearching(true);
+    try {
+      const res = await api.trackOrder(query);
+      if (res.success && res.order) {
+        setRemoteOrder(res.order);
+        setActiveOrderId(res.order.id);
+        addToast(`Order #${res.order.orderNumber || res.order.id} found!`, 'success');
+      } else {
+        setRemoteOrder(null);
+        addToast(`Order "${query}" not found in database.`, 'warning');
+      }
+    } catch (err) {
+      setRemoteOrder(null);
+      addToast(err.message || `Order "${query}" not found.`, 'warning');
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -59,7 +95,7 @@ export const OrderTrackingPage = () => {
           Track Your Chocolate Order
         </h1>
         <p className="text-xs sm:text-sm text-stone-600">
-          Enter your Order ID (e.g. ZS-74921) to follow your handmade chocolates in real time.
+          Enter your Order Number (e.g. ZS-1731405000000) to follow your handmade chocolates in real time.
         </p>
       </div>
 
@@ -72,34 +108,40 @@ export const OrderTrackingPage = () => {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Enter Order ID (e.g. ZS-74921)"
+              placeholder="Enter Order Number or ID..."
               className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-cream-300 text-xs text-chocolate-950 uppercase font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-caramel-400 shadow-sm"
             />
           </div>
           <button
             type="submit"
-            className="px-5 py-3 rounded-2xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition"
+            disabled={isSearching}
+            className="px-5 py-3 rounded-2xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition flex items-center gap-1.5"
           >
-            Track
+            {isSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+            <span>Track</span>
           </button>
         </form>
 
-        {/* Quick order chips */}
-        <div className="flex items-center justify-center gap-2 mt-3 text-xs text-stone-500">
-          <span>Sample Orders:</span>
-          {orders.slice(0, 3).map((o) => (
-            <button
-              key={o.id}
-              onClick={() => {
-                setSearchInput(o.id);
-                setActiveOrderId(o.id);
-              }}
-              className="px-2 py-0.5 rounded-lg bg-cream-200 text-chocolate-900 font-mono text-[11px] hover:bg-cream-300"
-            >
-              #{o.id}
-            </button>
-          ))}
-        </div>
+        {/* Quick order chips if customer has orders */}
+        {(orders || []).length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-3 text-xs text-stone-500">
+            <span>Your Recent Orders:</span>
+            {orders.slice(0, 3).map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  setSearchInput(o.orderNumber || o.id);
+                  setRemoteOrder(o);
+                  setActiveOrderId(o.id);
+                }}
+                className="px-2 py-0.5 rounded-lg bg-cream-200 text-chocolate-900 font-mono text-[11px] hover:bg-cream-300 font-bold"
+              >
+                #{o.orderNumber || o.id}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {selectedOrder ? (
@@ -110,14 +152,14 @@ export const OrderTrackingPage = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-mono text-xl font-bold text-chocolate-950">
-                  #{selectedOrder.id}
+                  #{selectedOrder.orderNumber || selectedOrder.id}
                 </h3>
                 <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-caramel-100 text-caramel-800 border border-caramel-300">
                   {selectedOrder.orderStatus}
                 </span>
               </div>
               <p className="text-xs text-stone-500 mt-1">
-                Customer: <strong>{selectedOrder.customer.name}</strong> • +91 {selectedOrder.customer.phone}
+                Customer: <strong>{selectedOrder.customer?.name}</strong> • +91 {selectedOrder.customer?.phone}
               </p>
             </div>
 
@@ -127,7 +169,7 @@ export const OrderTrackingPage = () => {
                 ₹{selectedOrder.grandTotal}
               </div>
               <div className="text-[11px] text-stone-500">
-                {selectedOrder.items.length} items • {selectedOrder.paymentMethod}
+                {(selectedOrder.items || []).length} items • {selectedOrder.paymentMethod} ({selectedOrder.paymentStatus})
               </div>
             </div>
           </div>
@@ -158,7 +200,10 @@ export const OrderTrackingPage = () => {
                   const Icon = step.icon;
                   const isCompleted = idx <= currentStatusIndex;
                   const isCurrent = idx === currentStatusIndex;
-                  const stepTime = selectedOrder.timeline?.find((t) => t.status === step.name)?.time || 'Pending';
+                  const historyItem = (selectedOrder.statusHistory || []).find((h) => h.status === step.name);
+                  const stepTime = historyItem
+                    ? new Date(historyItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : isCompleted ? 'Completed' : 'Pending';
 
                   return (
                     <div key={step.name} className="flex md:flex-col items-center md:items-center text-left md:text-center gap-4 md:gap-2">
@@ -200,34 +245,36 @@ export const OrderTrackingPage = () => {
             </div>
           </div>
 
-          {/* SIMULATION ACTION FOR TESTING (Allows immediate status testing right here!) */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-cream-100/80 border border-caramel-300 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-caramel-800 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-caramel-600" />
-                <span>Simulate Order Status Changes (For Demo Review)</span>
-              </span>
-              <span className="text-[11px] text-stone-500 hidden sm:inline">
-                Click any stage to update live
-              </span>
-            </div>
+          {/* Owner Quick Controls (Visible only when logged in as Shopkeeper) */}
+          {isAdminLoggedIn && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-300 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-700" />
+                  <span>Shopkeeper Control: Update Live Order Status</span>
+                </span>
+                <span className="text-[11px] text-amber-800">
+                  Owner Admin Mode
+                </span>
+              </div>
 
-            <div className="flex flex-wrap gap-2">
-              {statusSteps.map((step) => (
-                <button
-                  key={step.name}
-                  onClick={() => updateOrderStatus(selectedOrder.id, step.name)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    selectedOrder.orderStatus === step.name
-                      ? 'bg-chocolate-900 text-gold-300 ring-2 ring-gold-400 shadow-sm'
-                      : 'bg-white text-chocolate-800 border border-cream-300 hover:bg-cream-200'
-                  }`}
-                >
-                  {step.name}
-                </button>
-              ))}
+              <div className="flex flex-wrap gap-2">
+                {statusSteps.map((step) => (
+                  <button
+                    key={step.name}
+                    onClick={() => updateOrderStatus(selectedOrder.id, step.name)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                      selectedOrder.orderStatus === step.name
+                        ? 'bg-chocolate-900 text-gold-300 ring-2 ring-gold-400 shadow-sm'
+                        : 'bg-white text-chocolate-800 border border-cream-300 hover:bg-cream-200'
+                    }`}
+                  >
+                    {step.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Order Details & Items breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-cream-200">
@@ -236,12 +283,12 @@ export const OrderTrackingPage = () => {
                 Delivery Destination
               </h5>
               <div className="p-4 rounded-2xl bg-cream-50 border border-cream-200 text-xs text-stone-700 leading-relaxed">
-                <strong>{selectedOrder.customer.name}</strong>
+                <strong>{selectedOrder.customer?.name}</strong>
                 <br />
-                {selectedOrder.address.house}, {selectedOrder.address.street}
+                {selectedOrder.address?.house}, {selectedOrder.address?.street}
                 <br />
-                {selectedOrder.address.city}, {selectedOrder.address.state} - {selectedOrder.address.pincode}
-                {selectedOrder.address.instructions && (
+                {selectedOrder.address?.city}, {selectedOrder.address?.state} - {selectedOrder.address?.pincode}
+                {selectedOrder.address?.instructions && (
                   <p className="text-[11px] text-stone-500 italic mt-1">
                     "{selectedOrder.address.instructions}"
                   </p>
@@ -254,10 +301,18 @@ export const OrderTrackingPage = () => {
                 Chocolates in this Delivery
               </h5>
               <div className="space-y-2">
-                {selectedOrder.items.map((item, idx) => (
+                {(selectedOrder.items || []).map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-xl bg-cream-50">
                     <div className="flex items-center gap-2">
-                      <img src={item.image} alt={item.name} className="w-8 h-8 rounded-lg object-cover" />
+                      <img
+                        src={item.image || '/chocolate-placeholder.svg'}
+                        alt={item.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = '/chocolate-placeholder.svg';
+                        }}
+                        className="w-8 h-8 rounded-lg object-cover"
+                      />
                       <span>
                         {item.quantity}× {item.name} ({item.packageName})
                       </span>
@@ -273,7 +328,7 @@ export const OrderTrackingPage = () => {
           <div className="pt-4 border-t border-cream-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-600">
             <span>Questions about your batch? We're available on WhatsApp.</span>
             <a
-              href={`https://wa.me/?text=Hi%20Zora%20Shop,%20tracking%20update%20for%20order%20%23${selectedOrder.id}`}
+              href={`https://wa.me/${(shopSettings?.whatsappNumber || '919898014090').replace(/\D/g, '')}?text=${encodeURIComponent(`Hi Zora Shop, I am checking the status for order #${selectedOrder.orderNumber || selectedOrder.id}`)}`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shadow-sm"
@@ -291,7 +346,7 @@ export const OrderTrackingPage = () => {
             Order Not Found
           </h3>
           <p className="text-xs text-stone-500 mt-1">
-            Please check the Order ID and try again.
+            Please check the Order ID or Order Number and try again.
           </p>
         </div>
       )}
