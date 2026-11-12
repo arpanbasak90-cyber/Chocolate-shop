@@ -328,7 +328,7 @@ export const OrderTrackingPage = () => {
           <div className="pt-4 border-t border-cream-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-600">
             <span>Questions about your batch? We're available on WhatsApp.</span>
             <a
-              href={`https://wa.me/${(shopSettings?.whatsappNumber || '919898014090').replace(/\D/g, '')}?text=${encodeURIComponent(`Hi Zora Shop, I am checking the status for order #${selectedOrder.orderNumber || selectedOrder.id}`)}`}
+              href={`https://wa.me/${((shopSettings?.whatsappNumber || '916289760577').replace(/\D/g, '').length === 10 ? '91' + (shopSettings?.whatsappNumber || '916289760577').replace(/\D/g, '') : (shopSettings?.whatsappNumber || '916289760577').replace(/\D/g, ''))}?text=${encodeURIComponent(`Hi Zora Shop, I am checking the status for order #${selectedOrder.orderNumber || selectedOrder.id}`)}`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shadow-sm"

@@ -96,11 +96,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Auto-seed initial owner account if none exists
+// Auto-seed initial owner accounts if none exist
 async function bootstrapInitialOwner() {
   try {
-    const existingAdmin = await db.findAdminByEmail('zorashop.homemade@gmail.com');
-    if (!existingAdmin) {
+    const existingAdmin1 = await db.findAdminByEmail('zorashop.homemade@gmail.com');
+    if (!existingAdmin1) {
       await db.createAdminUser({
         name: 'Drashti Bhatt',
         email: 'zorashop.homemade@gmail.com',
@@ -108,6 +108,17 @@ async function bootstrapInitialOwner() {
         role: 'OWNER'
       });
       console.log('👑 Default Owner initialized: zorashop.homemade@gmail.com (+91 98980 14090)');
+    }
+
+    const existingAdmin2 = await db.findAdminByEmail('arpanbasak90@gmail.com');
+    if (!existingAdmin2) {
+      await db.createAdminUser({
+        name: 'Arpan Basak',
+        email: 'arpanbasak90@gmail.com',
+        phone: '+916289760577',
+        role: 'OWNER'
+      });
+      console.log('👑 Owner initialized: arpanbasak90@gmail.com (+91 6289760577)');
     }
   } catch (err) {
     console.error('Owner bootstrap error:', err);

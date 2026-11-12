@@ -863,7 +863,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   type="text"
                   value={shopSettings.whatsappNumber}
                   onChange={(e) => setShopSettings({ ...shopSettings, whatsappNumber: e.target.value })}
-                  placeholder="+91 98980 14090"
+                  placeholder="+91 6289760577"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#1c0c07] border border-[#421d10] text-xs text-white font-mono focus:outline-none focus:border-caramel-500"
                 />
                 <span className="text-[10px] text-stone-400 mt-1 block">

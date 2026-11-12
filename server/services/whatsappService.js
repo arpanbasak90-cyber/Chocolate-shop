@@ -4,7 +4,8 @@ import { config } from '../config/env.js';
  * Format genuine WhatsApp click-to-chat URL with complete order details
  */
 export function generateWhatsAppOrderUrl(order) {
-  const shopNumber = (config.shop.whatsappNumber || '+91 98980 14090').replace(/\D/g, '');
+  const rawNumber = (config.shop.whatsappNumber || '6289760577').replace(/\D/g, '');
+  const shopNumber = rawNumber.length === 10 ? `91${rawNumber}` : rawNumber;
 
   const itemsList = (order.items || [])
     .map((it, idx) => `  ${idx + 1}. *${it.name}* (${it.packageName || it.packageType}) x ${it.quantity} = ₹${it.total}`)

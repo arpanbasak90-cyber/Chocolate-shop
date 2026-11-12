@@ -7,7 +7,7 @@ const ShopContext = createContext();
 const DEFAULT_SETTINGS = {
   shopName: 'ZORA SHOP',
   tagline: 'Sweetness in Every Bite!',
-  whatsappNumber: '+91 98980 14090',
+  whatsappNumber: '+91 6289760577',
   contactEmail: 'zorashop.homemade@gmail.com',
   shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
   standardDeliveryFee: 40,

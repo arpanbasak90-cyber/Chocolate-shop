@@ -1,4 +1,12 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly load server/.env regardless of the working directory
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
 export const config = {
@@ -22,6 +30,11 @@ export const config = {
     from: process.env.SMTP_FROM || '"ZORA SHOP" <noreply@zorashop.com>'
   },
 
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.RESEND_FROM || 'ZORA SHOP <onboarding@resend.dev>'
+  },
+
   sms: {
     twilioSid: process.env.TWILIO_ACCOUNT_SID || '',
     twilioToken: process.env.TWILIO_AUTH_TOKEN || '',
@@ -38,7 +51,7 @@ export const config = {
   shop: {
     name: process.env.SHOP_NAME || 'ZORA SHOP',
     tagline: process.env.SHOP_TAGLINE || 'Sweetness in Every Bite!',
-    whatsappNumber: process.env.SHOP_WHATSAPP_NUMBER || '+91 98980 14090',
+    whatsappNumber: process.env.WHATSAPP_PHONE || process.env.SHOP_WHATSAPP_NUMBER || '+91 6289760577',
     contactEmail: process.env.SHOP_CONTACT_EMAIL || 'zorashop.homemade@gmail.com',
     address: process.env.SHOP_ADDRESS || 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
     deliveryFeeThreshold: 500,
