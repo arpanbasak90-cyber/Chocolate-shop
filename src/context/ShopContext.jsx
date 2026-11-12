@@ -197,14 +197,14 @@ export const ShopProvider = ({ children }) => {
   }, [sessionRole, refreshCustomerOrders]);
 
   // ==========================================================================
-  // REAL AUTHENTICATION ACTIONS (Dual OTP: Email + Mobile)
+  // REAL AUTHENTICATION ACTIONS (Email OTP Verification via Resend)
   // ==========================================================================
 
-  // Customer: Request OTPs
+  // Customer: Request Email OTP
   const sendCustomerOtp = async ({ name, email, phone }) => {
     try {
       const res = await api.sendCustomerOtp({ name, email, phone });
-      addToast('Verification codes sent to your Email & Mobile number!', 'info');
+      addToast('Verification code sent to your Email address!', 'info');
       return res;
     } catch (err) {
       addToast(err.message, 'warning');
@@ -212,10 +212,10 @@ export const ShopProvider = ({ children }) => {
     }
   };
 
-  // Customer: Verify both OTPs
-  const verifyCustomerOtp = async ({ name, email, phone, emailOtp, mobileOtp }) => {
+  // Customer: Verify Email OTP
+  const verifyCustomerOtp = async ({ name, email, phone, emailOtp }) => {
     try {
-      const res = await api.verifyCustomerOtp({ name, email, phone, emailOtp, mobileOtp });
+      const res = await api.verifyCustomerOtp({ name, email, phone, emailOtp });
       if (res.success && res.customer) {
         setCurrentCustomer(res.customer);
         setSessionRole('customer');
@@ -251,11 +251,11 @@ export const ShopProvider = ({ children }) => {
     addToast('Profile & delivery address updated successfully!', 'success');
   }, [addToast]);
 
-  // Shopkeeper: Request OTPs
+  // Shopkeeper: Request Email OTP
   const sendAdminOtp = async ({ email }) => {
     try {
       const res = await api.sendAdminOtp({ email });
-      addToast('Owner verification codes dispatched to registered email & phone.', 'info');
+      addToast('Owner verification code dispatched to registered email.', 'info');
       return res;
     } catch (err) {
       addToast(err.message, 'warning');
@@ -263,10 +263,10 @@ export const ShopProvider = ({ children }) => {
     }
   };
 
-  // Shopkeeper: Verify both OTPs
-  const verifyAdminOtp = async ({ email, emailOtp, mobileOtp }) => {
+  // Shopkeeper: Verify Email OTP
+  const verifyAdminOtp = async ({ email, emailOtp }) => {
     try {
-      const res = await api.verifyAdminOtp({ email, emailOtp, mobileOtp });
+      const res = await api.verifyAdminOtp({ email, emailOtp });
       if (res.success && res.admin) {
         setAdminUser(res.admin);
         setSessionRole('shopkeeper');

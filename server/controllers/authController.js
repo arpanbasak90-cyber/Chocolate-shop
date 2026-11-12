@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import validator from 'validator';
 import { db } from '../services/database.js';
 import { sendEmailOtp } from '../services/emailService.js';
-import { sendSmsOtp } from '../services/smsService.js';
 import { signToken, setAuthCookie, clearAuthCookie, COOKIE_NAME_CUSTOMER, COOKIE_NAME_ADMIN } from '../middleware/auth.js';
 import { config } from '../config/env.js';
 
@@ -17,7 +16,7 @@ function generateSecureOtp() {
 }
 
 /**
- * 1. CUSTOMER: Initiate Dual OTP Verification (Email + Mobile)
+ * 1. CUSTOMER: Initiate Email OTP Verification
  */
 export async function sendCustomerOtp(req, res) {
   try {
@@ -37,12 +36,11 @@ export async function sendCustomerOtp(req, res) {
     const cleanEmail = email.trim().toLowerCase();
     const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
 
-    // Generate separate 6-digit OTPs
+    // Generate secure 6-digit Email OTP
     const emailOtp = generateSecureOtp();
-    const mobileOtp = generateSecureOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
 
-    // Store hashed OTP records in DB
+    // Store hashed OTP record in DB
     await db.saveOtp({
       identifier: cleanEmail,
       channel: 'EMAIL',
@@ -51,23 +49,12 @@ export async function sendCustomerOtp(req, res) {
       expiresAt
     });
 
-    await db.saveOtp({
-      identifier: formattedPhone,
-      channel: 'SMS',
-      type: 'CUSTOMER_AUTH',
-      otpHash: hashOtp(mobileOtp),
-      expiresAt
-    });
-
-    // Deliver Real OTPs through providers
-    await Promise.all([
-      sendEmailOtp({ toEmail: cleanEmail, otpCode: emailOtp, recipientName: name.trim(), isOwner: false }),
-      sendSmsOtp({ toPhone: formattedPhone, otpCode: mobileOtp, isOwner: false })
-    ]);
+    // Deliver Real OTP to customer's email
+    await sendEmailOtp({ toEmail: cleanEmail, otpCode: emailOtp, recipientName: name.trim(), isOwner: false });
 
     return res.status(200).json({
       success: true,
-      message: 'Separate verification OTPs have been sent to your Email address and Mobile number. Both are required.',
+      message: 'A 6-digit verification code has been sent to your Email address.',
       details: {
         email: cleanEmail,
         phone: formattedPhone,
@@ -76,29 +63,29 @@ export async function sendCustomerOtp(req, res) {
     });
   } catch (error) {
     console.error('Error in sendCustomerOtp:', error);
-    return res.status(500).json({ success: false, message: 'Failed to send verification codes. Please try again.' });
+    return res.status(500).json({ success: false, message: 'Failed to send verification code. Please try again.' });
   }
 }
 
 /**
- * 2. CUSTOMER: Complete Dual OTP Verification (Verifies BOTH Email & Mobile OTPs)
+ * 2. CUSTOMER: Complete Email OTP Verification
  */
 export async function verifyCustomerOtp(req, res) {
   try {
-    const { name, email, phone, emailOtp, mobileOtp } = req.body;
+    const { name, email, phone, emailOtp } = req.body;
 
-    if (!email || !phone || !emailOtp || !mobileOtp) {
+    if (!email || !emailOtp) {
       return res.status(400).json({
         success: false,
-        message: 'Both Email OTP and Mobile OTP must be provided.'
+        message: 'Email address and 6-digit Email OTP must be provided.'
       });
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPhone = phone.replace(/\D/g, '');
-    const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : (cleanPhone ? `+${cleanPhone}` : '');
 
-    // 1. Verify Email OTP
+    // Verify Email OTP
     const emailRecord = await db.getLatestOtp({ identifier: cleanEmail, channel: 'EMAIL', type: 'CUSTOMER_AUTH' });
     if (!emailRecord) {
       return res.status(400).json({ success: false, message: 'No active OTP found for this email. Please request a new code.' });
@@ -114,27 +101,8 @@ export async function verifyCustomerOtp(req, res) {
       return res.status(400).json({ success: false, message: 'Invalid Email OTP code. Please check and re-enter.' });
     }
 
-    // 2. Verify Mobile OTP
-    const mobileRecord = await db.getLatestOtp({ identifier: formattedPhone, channel: 'SMS', type: 'CUSTOMER_AUTH' });
-    if (!mobileRecord) {
-      return res.status(400).json({ success: false, message: 'No active OTP found for this mobile number.' });
-    }
-    if (new Date() > new Date(mobileRecord.expiresAt)) {
-      return res.status(400).json({ success: false, message: 'The Mobile OTP has expired. Please request a new code.' });
-    }
-    if (mobileRecord.attempts >= 5) {
-      return res.status(400).json({ success: false, message: 'Too many incorrect Mobile OTP attempts.' });
-    }
-    if (mobileRecord.otpHash !== hashOtp(mobileOtp.trim())) {
-      await db.incrementOtpAttempts(mobileRecord.id);
-      return res.status(400).json({ success: false, message: 'Invalid Mobile OTP code. Please check and re-enter.' });
-    }
-
-    // Mark both OTPs as verified to prevent replay
-    await Promise.all([
-      db.markOtpVerified(emailRecord.id),
-      db.markOtpVerified(mobileRecord.id)
-    ]);
+    // Mark OTP as verified to prevent replay
+    await db.markOtpVerified(emailRecord.id);
 
     // Create or retrieve verified customer record in DB
     const customer = await db.createOrUpdateCustomer({
@@ -149,7 +117,7 @@ export async function verifyCustomerOtp(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: 'Both Email and Mobile number verified successfully!',
+      message: 'Email address verified successfully!',
       customer: {
         id: customer.id,
         name: customer.name,
@@ -190,7 +158,7 @@ export function customerLogout(req, res) {
 }
 
 /**
- * 5. ADMIN / SHOPKEEPER: Initiate Owner Login with Dual OTP
+ * 5. ADMIN / SHOPKEEPER: Initiate Owner Login with Email OTP
  */
 export async function sendAdminOtp(req, res) {
   try {
@@ -210,7 +178,6 @@ export async function sendAdminOtp(req, res) {
     }
 
     const emailOtp = generateSecureOtp();
-    const mobileOtp = generateSecureOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await db.saveOtp({
@@ -221,28 +188,13 @@ export async function sendAdminOtp(req, res) {
       expiresAt
     });
 
-    await db.saveOtp({
-      identifier: admin.phone,
-      channel: 'SMS',
-      type: 'ADMIN_AUTH',
-      otpHash: hashOtp(mobileOtp),
-      expiresAt
-    });
-
-    await Promise.all([
-      sendEmailOtp({ toEmail: admin.email, otpCode: emailOtp, recipientName: admin.name, isOwner: true }),
-      sendSmsOtp({ toPhone: admin.phone, otpCode: mobileOtp, isOwner: true })
-    ]);
-
-    // Mask phone for security display e.g. +91 98*****090
-    const maskedPhone = admin.phone.replace(/(\+\d{2}\s?\d{2})\d+(\d{3})/, '$1*****$2');
+    await sendEmailOtp({ toEmail: admin.email, otpCode: emailOtp, recipientName: admin.name, isOwner: true });
 
     return res.status(200).json({
       success: true,
-      message: 'Dual verification OTPs dispatched to registered Owner Email and Mobile number.',
+      message: 'Verification code dispatched to your registered Owner Email address.',
       details: {
-        email: admin.email,
-        phoneMasked: maskedPhone
+        email: admin.email
       }
     });
   } catch (error) {
@@ -252,14 +204,14 @@ export async function sendAdminOtp(req, res) {
 }
 
 /**
- * 6. ADMIN / SHOPKEEPER: Verify Dual OTPs & Authenticate
+ * 6. ADMIN / SHOPKEEPER: Verify Email OTP & Authenticate
  */
 export async function verifyAdminOtp(req, res) {
   try {
-    const { email, emailOtp, mobileOtp } = req.body;
+    const { email, emailOtp } = req.body;
 
-    if (!email || !emailOtp || !mobileOtp) {
-      return res.status(400).json({ success: false, message: 'Email, Email OTP, and Mobile OTP are all required.' });
+    if (!email || !emailOtp) {
+      return res.status(400).json({ success: false, message: 'Owner Email and 6-digit Email OTP are required.' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
@@ -274,16 +226,7 @@ export async function verifyAdminOtp(req, res) {
       return res.status(400).json({ success: false, message: 'Invalid or expired Email OTP code.' });
     }
 
-    // Verify Mobile OTP
-    const mobileRecord = await db.getLatestOtp({ identifier: admin.phone, channel: 'SMS', type: 'ADMIN_AUTH' });
-    if (!mobileRecord || new Date() > new Date(mobileRecord.expiresAt) || mobileRecord.otpHash !== hashOtp(mobileOtp.trim())) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired Mobile SMS OTP code.' });
-    }
-
-    await Promise.all([
-      db.markOtpVerified(emailRecord.id),
-      db.markOtpVerified(mobileRecord.id)
-    ]);
+    await db.markOtpVerified(emailRecord.id);
 
     const token = signToken({ id: admin.id, email: admin.email, role: 'OWNER' });
     setAuthCookie(res, COOKIE_NAME_ADMIN, token);
@@ -332,7 +275,7 @@ export async function setupInitialOwner(req, res) {
     console.log(`👑 Initial Shopkeeper Owner Account registered: ${admin.email} (${admin.phone})`);
     return res.status(201).json({
       success: true,
-      message: 'Initial Shopkeeper Owner Account created securely. Owner can now authenticate using Dual Email & Mobile OTP.',
+      message: 'Initial Shopkeeper Owner Account created securely. Owner can now authenticate using Email OTP.',
       admin: {
         name: admin.name,
         email: admin.email,

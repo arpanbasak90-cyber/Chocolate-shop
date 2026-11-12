@@ -13,12 +13,10 @@ export const FirstScreen = () => {
   const [custEmail, setCustEmail] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [custEmailOtp, setCustEmailOtp] = useState('');
-  const [custMobileOtp, setCustMobileOtp] = useState('');
 
   // Shopkeeper Form State
   const [adminEmail, setAdminEmail] = useState('zorashop.homemade@gmail.com');
   const [adminEmailOtp, setAdminEmailOtp] = useState('');
-  const [adminMobileOtp, setAdminMobileOtp] = useState('');
 
   // Loading & status states
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +33,7 @@ export const FirstScreen = () => {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // Handle Customer Step 1: Send Dual OTPs
+  // Handle Customer Step 1: Send Email OTP
   const handleCustomerSendOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -52,20 +50,20 @@ export const FirstScreen = () => {
       });
       setActiveView('customer-step2');
       setCountdown(300); // 5 minutes
-      setSuccessInfo(`Verification codes dispatched to ${custEmail.trim()} and your mobile.`);
+      setSuccessInfo(`Verification code dispatched to ${custEmail.trim()}.`);
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to dispatch verification codes.');
+      setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Customer Step 2: Verify Dual OTPs
+  // Handle Customer Step 2: Verify Email OTP
   const handleCustomerVerify = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!custEmailOtp.trim() || !custMobileOtp.trim()) {
-      setErrorMessage('Both Email OTP and Mobile OTP are required to authenticate.');
+    if (!custEmailOtp.trim()) {
+      setErrorMessage('Please enter the 6-digit Email OTP to authenticate.');
       return;
     }
     setIsLoading(true);
@@ -74,17 +72,16 @@ export const FirstScreen = () => {
         name: custName.trim(),
         email: custEmail.trim(),
         phone: custPhone.trim(),
-        emailOtp: custEmailOtp.trim(),
-        mobileOtp: custMobileOtp.trim()
+        emailOtp: custEmailOtp.trim()
       });
     } catch (err) {
-      setErrorMessage(err.message || 'Verification failed. Please check both OTP codes.');
+      setErrorMessage(err.message || 'Verification failed. Please check your Email OTP code.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Shopkeeper Step 1: Send Dual OTPs
+  // Handle Shopkeeper Step 1: Send Email OTP
   const handleAdminSendOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -97,7 +94,7 @@ export const FirstScreen = () => {
       await sendAdminOtp({ email: adminEmail.trim() });
       setActiveView('shopkeeper-step2');
       setCountdown(300);
-      setSuccessInfo(`Owner verification codes sent to ${adminEmail.trim()} and registered mobile.`);
+      setSuccessInfo(`Owner verification code sent to ${adminEmail.trim()}.`);
     } catch (err) {
       setErrorMessage(err.message || 'Owner authentication failed.');
     } finally {
@@ -105,20 +102,19 @@ export const FirstScreen = () => {
     }
   };
 
-  // Handle Shopkeeper Step 2: Verify Dual OTPs
+  // Handle Shopkeeper Step 2: Verify Email OTP
   const handleAdminVerify = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!adminEmailOtp.trim() || !adminMobileOtp.trim()) {
-      setErrorMessage('Both Owner Email OTP and Mobile SMS OTP must be entered.');
+    if (!adminEmailOtp.trim()) {
+      setErrorMessage('Please enter the 6-digit Owner Email OTP.');
       return;
     }
     setIsLoading(true);
     try {
       await verifyAdminOtp({
         email: adminEmail.trim(),
-        emailOtp: adminEmailOtp.trim(),
-        mobileOtp: adminMobileOtp.trim()
+        emailOtp: adminEmailOtp.trim()
       });
     } catch (err) {
       setErrorMessage(err.message || 'Owner verification failed.');
@@ -224,7 +220,7 @@ export const FirstScreen = () => {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 2: CUSTOMER STEP 1 — ENTER DETAILS TO REQUEST DUAL OTPS
+            VIEW 2: CUSTOMER STEP 1 — ENTER DETAILS TO REQUEST EMAIL OTP
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === 'customer-step1' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
@@ -236,7 +232,7 @@ export const FirstScreen = () => {
                 Customer Registration & Login
               </h2>
               <p className="text-xs text-stone-600">
-                Enter your details to receive Email & Mobile verification codes.
+                Enter your details to receive an Email verification code.
               </p>
             </div>
 
@@ -284,7 +280,7 @@ export const FirstScreen = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Mobile Number *
+                  Mobile Number (Contact & Orders) *
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -308,10 +304,10 @@ export const FirstScreen = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Sending OTPs...</span>
+                      <span>Sending Email OTP...</span>
                     </>
                   ) : (
-                    <span>Send Verification OTPs →</span>
+                    <span>Send Verification OTP →</span>
                   )}
                 </button>
 
@@ -326,13 +322,13 @@ export const FirstScreen = () => {
             </form>
 
             <div className="text-[11px] text-center text-stone-500">
-              🔒 Real Dual Verification: Separate OTPs will be delivered to your Email and Mobile.
+              🔒 Real Email Verification: A 6-digit OTP will be delivered directly to your email inbox.
             </div>
           </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 3: CUSTOMER STEP 2 — ENTER BOTH EMAIL OTP AND MOBILE OTP
+            VIEW 3: CUSTOMER STEP 2 — ENTER EMAIL OTP
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === 'customer-step2' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
@@ -341,10 +337,10 @@ export const FirstScreen = () => {
                 <KeyRound className="w-7 h-7" />
               </div>
               <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
-                Verify Both OTPs
+                Verify Email OTP
               </h2>
               <p className="text-xs text-stone-600">
-                Codes sent to <strong>{custEmail}</strong> & <strong>{custPhone}</strong>
+                Code sent to <strong>{custEmail}</strong>
               </p>
             </div>
 
@@ -365,7 +361,7 @@ export const FirstScreen = () => {
             <form onSubmit={handleCustomerVerify} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  1. Email OTP Code *
+                  Email OTP Code (6 digits) *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -381,24 +377,6 @@ export const FirstScreen = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  2. Mobile SMS OTP Code *
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={custMobileOtp}
-                    onChange={(e) => setCustMobileOtp(e.target.value)}
-                    placeholder="Enter 6-digit Mobile OTP"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
-                  />
-                </div>
-              </div>
-
               <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
                 <span>⏱️ Valid: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
                 <button
@@ -407,7 +385,7 @@ export const FirstScreen = () => {
                   onClick={handleCustomerSendOtp}
                   className={`font-bold ${countdown > 0 ? 'text-stone-400 cursor-not-allowed' : 'text-caramel-700 hover:underline'}`}
                 >
-                  Resend OTPs
+                  Resend Email OTP
                 </button>
               </div>
 
@@ -420,7 +398,7 @@ export const FirstScreen = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Codes...</span>
+                      <span>Verifying Code...</span>
                     </>
                   ) : (
                     <span>Verify & Start Shopping →</span>
@@ -482,8 +460,8 @@ export const FirstScreen = () => {
               </div>
 
               <div className="p-3 rounded-xl bg-amber-100/90 border border-amber-300 text-[11px] text-amber-950 space-y-1">
-                <p className="font-bold">🔐 Real Owner Authentication:</p>
-                <p>A separate Email OTP and Mobile SMS OTP will be generated on the backend and dispatched to the authorized store owner.</p>
+                <p className="font-bold">🔐 Real Owner Email Authentication:</p>
+                <p>A 6-digit verification code will be generated on the backend and sent directly to the authorized store owner's inbox.</p>
               </div>
 
               <div className="pt-2 flex flex-col gap-2">
@@ -495,10 +473,10 @@ export const FirstScreen = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Sending Owner OTPs...</span>
+                      <span>Sending Owner OTP...</span>
                     </>
                   ) : (
-                    <span>Send Owner Verification Codes →</span>
+                    <span>Send Owner Verification Code →</span>
                   )}
                 </button>
 
@@ -515,7 +493,7 @@ export const FirstScreen = () => {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 5: SHOPKEEPER STEP 2 — ENTER DUAL OWNER OTPS
+            VIEW 5: SHOPKEEPER STEP 2 — ENTER OWNER EMAIL OTP
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === 'shopkeeper-step2' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
@@ -524,10 +502,10 @@ export const FirstScreen = () => {
                 <ShieldCheck className="w-7 h-7" />
               </div>
               <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
-                Owner Dual Verification
+                Owner Email Verification
               </h2>
               <p className="text-xs text-stone-600">
-                Codes sent to <strong>{adminEmail}</strong>
+                Code sent to <strong>{adminEmail}</strong>
               </p>
             </div>
 
@@ -548,7 +526,7 @@ export const FirstScreen = () => {
             <form onSubmit={handleAdminVerify} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  1. Owner Email OTP Code *
+                  Owner Email OTP Code (6 digits) *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -564,24 +542,6 @@ export const FirstScreen = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  2. Owner Mobile SMS OTP Code *
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={adminMobileOtp}
-                    onChange={(e) => setAdminMobileOtp(e.target.value)}
-                    placeholder="Enter 6-digit Mobile OTP"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
-                  />
-                </div>
-              </div>
-
               <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
                 <span>⏱️ Valid: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
                 <button
@@ -590,7 +550,7 @@ export const FirstScreen = () => {
                   onClick={handleAdminSendOtp}
                   className={`font-bold ${countdown > 0 ? 'text-stone-400 cursor-not-allowed' : 'text-caramel-700 hover:underline'}`}
                 >
-                  Resend Codes
+                  Resend Email OTP
                 </button>
               </div>
 
@@ -603,7 +563,7 @@ export const FirstScreen = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Owner Codes...</span>
+                      <span>Verifying Code...</span>
                     </>
                   ) : (
                     <span>Verify & Access Owner Dashboard →</span>

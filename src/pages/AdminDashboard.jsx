@@ -613,7 +613,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   <div className="text-3xl">👥</div>
                   <p className="font-semibold text-white">No Registered Customer Accounts Yet</p>
                   <p className="text-[11px] text-stone-500 max-w-sm mx-auto">
-                    When customers register via Email & Mobile Dual-OTP and place chocolate orders, their verified profiles appear here.
+                    When customers register via Email OTP and place chocolate orders, their verified profiles appear here.
                   </p>
                 </div>
               ) : (

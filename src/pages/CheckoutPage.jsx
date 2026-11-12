@@ -225,7 +225,7 @@ export const CheckoutPage = () => {
                   <span>Verified Customer Profile</span>
                 </span>
                 <span className="text-[11px] text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
-                  Dual-OTP Verified
+                  Email Verified
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">

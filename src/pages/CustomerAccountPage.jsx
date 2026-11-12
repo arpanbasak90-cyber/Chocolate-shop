@@ -34,13 +34,12 @@ export const CustomerAccountPage = () => {
 
   const navigate = useNavigate();
 
-  // Dual OTP Auth Step: 1 = Enter Details, 2 = Verify Email & Mobile OTP
+  // Email OTP Auth Step: 1 = Enter Details, 2 = Verify Email OTP
   const [authStep, setAuthStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [emailOtp, setEmailOtp] = useState('');
-  const [mobileOtp, setMobileOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -58,7 +57,7 @@ export const CustomerAccountPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
 
-  // Handle Step 1: Request Email & Mobile OTP
+  // Handle Step 1: Request Email OTP
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -76,18 +75,18 @@ export const CustomerAccountPage = () => {
       setAuthStep(2);
       setCountdown(300);
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to dispatch verification codes.');
+      setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Step 2: Verify Dual OTPs
+  // Handle Step 2: Verify Email OTP
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!emailOtp.trim() || !mobileOtp.trim()) {
-      setErrorMessage('Both Email OTP and Mobile OTP are required.');
+    if (!emailOtp.trim()) {
+      setErrorMessage('Please enter the 6-digit Email OTP.');
       return;
     }
     setIsLoading(true);
@@ -96,11 +95,10 @@ export const CustomerAccountPage = () => {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        emailOtp: emailOtp.trim(),
-        mobileOtp: mobileOtp.trim()
+        emailOtp: emailOtp.trim()
       });
     } catch (err) {
-      setErrorMessage(err.message || 'Verification failed. Please check both codes.');
+      setErrorMessage(err.message || 'Verification failed. Please check your code.');
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +146,7 @@ export const CustomerAccountPage = () => {
               Customer Account Portal
             </h1>
             <p className="text-xs text-stone-500">
-              Secure Dual-OTP Verification (Email + Mobile SMS). Sign in or register in seconds.
+              Secure Email OTP Verification. Sign in or register in seconds.
             </p>
           </div>
 
@@ -160,7 +158,7 @@ export const CustomerAccountPage = () => {
                     Enter Contact Details
                   </h3>
                   <p className="text-xs text-stone-500">
-                    We will send separate verification OTPs to your email and mobile.
+                    We will send a 6-digit verification code to your email address.
                   </p>
                 </div>
 
@@ -207,7 +205,7 @@ export const CustomerAccountPage = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Mobile Number (+91) *
+                    Mobile Number (Contact & Orders) *
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -230,11 +228,11 @@ export const CustomerAccountPage = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Sending Verification Codes...</span>
+                      <span>Sending Verification Code...</span>
                     </>
                   ) : (
                     <>
-                      <span>Send Dual Verification Codes</span>
+                      <span>Send Verification Code</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -245,7 +243,7 @@ export const CustomerAccountPage = () => {
                 <div className="pb-3 border-b border-cream-200">
                   <div className="flex items-center justify-between">
                     <h3 className="font-serif text-lg font-bold text-chocolate-950">
-                      Verify Dual OTPs
+                      Verify Email OTP
                     </h3>
                     <button
                       type="button"
@@ -256,7 +254,7 @@ export const CustomerAccountPage = () => {
                     </button>
                   </div>
                   <p className="text-[11px] text-stone-500 mt-1">
-                    Codes sent to <strong>{email}</strong> and <strong>+91 {phone}</strong>
+                    Code sent to <strong>{email}</strong>
                   </p>
                 </div>
 
@@ -282,27 +280,12 @@ export const CustomerAccountPage = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Mobile SMS OTP (6 digits) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={mobileOtp}
-                    onChange={(e) => setMobileOtp(e.target.value)}
-                    placeholder="Enter 6-digit SMS code"
-                    className="w-full px-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-center font-mono tracking-widest text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                  />
-                </div>
-
                 <div className="flex items-center justify-between text-[11px] text-stone-500">
                   <span>
                     {countdown > 0 ? (
                       `Code expires in ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`
                     ) : (
-                      <span className="text-red-600 font-bold">Codes expired</span>
+                      <span className="text-red-600 font-bold">Code expired</span>
                     )}
                   </span>
                   <button
@@ -311,7 +294,7 @@ export const CustomerAccountPage = () => {
                     onClick={handleRequestOtp}
                     className="text-caramel-700 font-bold hover:underline disabled:opacity-40"
                   >
-                    Resend Codes
+                    Resend Code
                   </button>
                 </div>
 
@@ -323,7 +306,7 @@ export const CustomerAccountPage = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Security Tokens...</span>
+                      <span>Verifying Code...</span>
                     </>
                   ) : (
                     <>

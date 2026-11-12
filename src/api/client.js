@@ -58,30 +58,30 @@ export const api = {
   },
   getProduct: (idOrSlug) => request(`/products/${idOrSlug}`),
 
-  // Customer Auth (Dual OTP)
+  // Customer Auth (Email OTP)
   sendCustomerOtp: ({ name, email, phone }) =>
     request('/auth/customer/send-otp', {
       method: 'POST',
       body: JSON.stringify({ name, email, phone })
     }),
-  verifyCustomerOtp: ({ name, email, phone, emailOtp, mobileOtp }) =>
+  verifyCustomerOtp: ({ name, email, phone, emailOtp }) =>
     request('/auth/customer/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ name, email, phone, emailOtp, mobileOtp })
+      body: JSON.stringify({ name, email, phone, emailOtp })
     }),
   getCustomerMe: () => request('/auth/customer/me'),
   customerLogout: () => request('/auth/customer/logout', { method: 'POST' }),
 
-  // Admin Auth (Dual OTP)
+  // Admin Auth (Email OTP)
   sendAdminOtp: ({ email }) =>
     request('/auth/admin/send-otp', {
       method: 'POST',
       body: JSON.stringify({ email })
     }),
-  verifyAdminOtp: ({ email, emailOtp, mobileOtp }) =>
+  verifyAdminOtp: ({ email, emailOtp }) =>
     request('/auth/admin/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ email, emailOtp, mobileOtp })
+      body: JSON.stringify({ email, emailOtp })
     }),
   getAdminMe: () => request('/auth/admin/me'),
   adminLogout: () => request('/auth/admin/logout', { method: 'POST' }),
