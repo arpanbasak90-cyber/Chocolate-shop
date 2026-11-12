@@ -369,3 +369,4 @@ export function adminLogout(req, res) {
   clearAuthCookie(res, COOKIE_NAME_ADMIN);
   return res.status(200).json({ success: true, message: 'Owner console session terminated.' });
 }
+

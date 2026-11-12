@@ -228,3 +228,4 @@ model StoreSettings {
   isOnlinePaymentEnabled Boolean @default(true)
   updatedAt             DateTime @updatedAt
 }
+

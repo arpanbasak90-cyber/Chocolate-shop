@@ -18,3 +18,4 @@ if (config.razorpay.keyId && config.razorpay.keySecret) {
 }
 
 export default razorpayInstance;
+

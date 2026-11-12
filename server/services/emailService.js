@@ -102,3 +102,4 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Chocolat
     return { success: true, isDevConsole: true };
   }
 }
+

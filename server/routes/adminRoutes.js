@@ -22,3 +22,4 @@ router.get('/settings', getStoreSettings);
 router.put('/settings', updateStoreSettings);
 
 export default router;
+

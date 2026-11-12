@@ -22,3 +22,4 @@ router.patch('/admin/:id/toggle-stock', requireAdmin, adminToggleStock);
 router.delete('/admin/:id', requireAdmin, adminDeleteProduct);
 
 export default router;
+

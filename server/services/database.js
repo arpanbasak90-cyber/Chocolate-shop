@@ -838,3 +838,4 @@ export const db = {
     return local.settings;
   }
 };
+

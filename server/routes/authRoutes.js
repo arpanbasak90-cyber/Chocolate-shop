@@ -31,3 +31,4 @@ router.post('/admin/logout', adminLogout);
 router.post('/admin/setup', setupInitialOwner);
 
 export default router;
+

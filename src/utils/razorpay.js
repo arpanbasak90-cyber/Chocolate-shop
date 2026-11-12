@@ -19,3 +19,4 @@ export function loadRazorpayScript() {
     document.body.appendChild(script);
   });
 }
+
