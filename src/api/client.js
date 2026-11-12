@@ -3,10 +3,18 @@
  * Centralized HTTP communication with the backend server
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+function resolveBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return '/api';
+  const trimmed = envUrl.trim().replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+}
+
+const API_BASE_URL = resolveBaseUrl();
 
 async function request(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE_URL}${cleanEndpoint}`;
   
   const headers = {
     'Content-Type': 'application/json',
@@ -24,7 +32,11 @@ async function request(endpoint, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.message || `Request failed with status ${response.status}`;
+      const errorMsg = data.message || (
+        response.status === 404
+          ? `Endpoint not found (404) at ${url}. Verify the backend server is running on port 5000.`
+          : `Request failed with status ${response.status}`
+      );
       throw new Error(errorMsg);
     }
 

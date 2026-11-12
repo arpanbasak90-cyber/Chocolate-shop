@@ -45,8 +45,8 @@ if (config.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoints (both /api/health and /health)
+const handleHealth = (req, res) => {
   res.status(200).json({
     status: 'healthy',
     shop: config.shop.name,
@@ -54,19 +54,36 @@ app.get('/api/health', (req, res) => {
     databaseEngine: db.isPostgresReady() ? 'PostgreSQL (Prisma)' : 'Local Persistent Storage',
     timestamp: new Date().toISOString()
   });
-});
+};
+app.get('/api/health', handleHealth);
+app.get('/health', handleHealth);
 
 // Mount Production API Routes
+// Mounted under both /api/* and root /* to ensure seamless compatibility across all client configurations
 app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/auth', authRoutes);
 
-// 404 Handler
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ success: false, message: `Endpoint ${req.originalUrl} not found on Zora Shop server.` });
+app.use('/api/products', productRoutes);
+app.use('/products', productRoutes);
+
+app.use('/api/cart', cartRoutes);
+app.use('/cart', cartRoutes);
+
+app.use('/api/orders', orderRoutes);
+app.use('/orders', orderRoutes);
+
+app.use('/api/payments', paymentRoutes);
+app.use('/payments', paymentRoutes);
+
+app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
+
+// JSON 404 Handler for all API routes (ensures frontend always receives a structured JSON message instead of HTML)
+app.use(['/api', '/api/*', '/auth', '/auth/*', '/products', '/products/*', '/cart', '/cart/*', '/orders', '/orders/*', '/payments', '/payments/*', '/admin', '/admin/*'], (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API endpoint ${req.method} ${req.originalUrl} not found on Zora Shop server.`
+  });
 });
 
 // Global Error Handler
