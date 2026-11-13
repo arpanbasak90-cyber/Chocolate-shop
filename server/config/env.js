@@ -45,7 +45,7 @@ export const config = {
   ownerEmails: (process.env.OWNER_EMAILS || 'abhijitsaha23485@gmail.com')
     .split(',')
     .map(e => e.trim().toLowerCase())
-    .filter(Boolean),
+    .filter(e => Boolean(e) && e !== 'arpanbasak90@gmail.com' && e !== 'zorashop.homemade@gmail.com'),
 
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID || '',

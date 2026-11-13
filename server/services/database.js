@@ -424,7 +424,7 @@ export const db = {
     }
 
     const local = readLocalDb();
-    const admin = (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail) || null;
+    const admin = (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail && a.email.toLowerCase() !== 'arpanbasak90@gmail.com') || null;
     if (admin && admin.isActive === undefined) {
       admin.isActive = true;
     }
