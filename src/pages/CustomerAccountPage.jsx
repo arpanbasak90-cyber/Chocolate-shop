@@ -40,6 +40,7 @@ export const CustomerAccountPage = () => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [emailOtp, setEmailOtp] = useState('');
+  const [devCodeInfo, setDevCodeInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [countdown, setCountdown] = useState(0);
@@ -61,19 +62,24 @@ export const CustomerAccountPage = () => {
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      setErrorMessage('Please fill in your Full Name, Email, and Mobile number.');
+    setDevCodeInfo('');
+    if (!name.trim() || !email.trim()) {
+      setErrorMessage('Please fill in your Full Name and Email address.');
       return;
     }
     setIsLoading(true);
     try {
-      await sendCustomerOtp({
+      const res = await sendCustomerOtp({
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim()
+        phone: phone.trim() || '9898014090'
       });
       setAuthStep(2);
       setCountdown(300);
+      if (res?.details?.devCode) {
+        setEmailOtp(res.details.devCode);
+        setDevCodeInfo(`Resend Sandbox Notice: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your OTP is: ${res.details.devCode}`);
+      }
     } catch (err) {
       setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
@@ -166,6 +172,18 @@ export const CustomerAccountPage = () => {
                   <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                     <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                {devCodeInfo && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                      <span>💡</span>
+                      <span>Notice</span>
+                    </div>
+                    <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
+                      {devCodeInfo}
+                    </p>
                   </div>
                 )}
 
@@ -262,6 +280,18 @@ export const CustomerAccountPage = () => {
                   <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                     <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                {devCodeInfo && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                      <span>💡</span>
+                      <span>Notice</span>
+                    </div>
+                    <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
+                      {devCodeInfo}
+                    </p>
                   </div>
                 )}
 

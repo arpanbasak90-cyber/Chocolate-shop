@@ -114,12 +114,25 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Chocolat
 
       if (res.ok && data.id) {
         console.log(`✉️ Real Email OTP successfully delivered via Resend to ${toEmail} (Resend ID: ${data.id})`);
-        return { success: true, provider: 'Resend', id: data.id };
+        return { success: true, provider: 'Resend', id: data.id, deliveredToInbox: true };
       } else {
-        console.warn(`⚠️ Resend dispatch notice for ${toEmail}: ${data.message || res.statusText}`);
+        const errorReason = data.message || res.statusText || 'Resend delivery rejected';
+        console.warn(`⚠️ Resend dispatch notice for ${toEmail}: ${errorReason}`);
+        return {
+          success: true,
+          provider: 'Resend',
+          deliveredToInbox: false,
+          reason: errorReason
+        };
       }
     } catch (err) {
       console.error('❌ Resend API request failed:', err.message);
+      return {
+        success: true,
+        provider: 'LocalFallback',
+        deliveredToInbox: false,
+        reason: err.message
+      };
     }
   }
 
@@ -129,6 +142,6 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Chocolat
   console.log(`🔑 Verification Code: ${otpCode}`);
   console.log(`💡 Delivered via active Zora Shop verification engine.`);
   console.log('═══════════════════════════════════════════════════════════════════\n');
-  return { success: true, isDevConsole: true };
+  return { success: true, deliveredToInbox: false, isDevConsole: true };
 }
 

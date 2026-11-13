@@ -16,8 +16,11 @@ async function request(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE_URL}${cleanEndpoint}`;
   
+  const token = typeof window !== 'undefined' ? localStorage.getItem('zora_auth_token') : null;
+
   const headers = {
     'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {})
   };
 
@@ -64,13 +67,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, email, phone })
     }),
-  verifyCustomerOtp: ({ name, email, phone, emailOtp }) =>
-    request('/auth/customer/verify-otp', {
+  verifyCustomerOtp: async ({ name, email, phone, emailOtp }) => {
+    const data = await request('/auth/customer/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ name, email, phone, emailOtp })
-    }),
+    });
+    if (data?.token && typeof window !== 'undefined') {
+      localStorage.setItem('zora_auth_token', data.token);
+      localStorage.setItem('zora_auth_role', 'customer');
+    }
+    return data;
+  },
   getCustomerMe: () => request('/auth/customer/me'),
-  customerLogout: () => request('/auth/customer/logout', { method: 'POST' }),
+  customerLogout: async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zora_auth_token');
+      localStorage.removeItem('zora_auth_role');
+    }
+    return request('/auth/customer/logout', { method: 'POST' });
+  },
 
   // Admin Auth (Email OTP)
   sendAdminOtp: ({ email }) =>
@@ -78,13 +93,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email })
     }),
-  verifyAdminOtp: ({ email, emailOtp }) =>
-    request('/auth/admin/verify-otp', {
+  verifyAdminOtp: async ({ email, emailOtp }) => {
+    const data = await request('/auth/admin/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ email, emailOtp })
-    }),
+    });
+    if (data?.token && typeof window !== 'undefined') {
+      localStorage.setItem('zora_auth_token', data.token);
+      localStorage.setItem('zora_auth_role', 'shopkeeper');
+    }
+    return data;
+  },
   getAdminMe: () => request('/auth/admin/me'),
-  adminLogout: () => request('/auth/admin/logout', { method: 'POST' }),
+  adminLogout: async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('zora_auth_token');
+      localStorage.removeItem('zora_auth_role');
+    }
+    return request('/auth/admin/logout', { method: 'POST' });
+  },
 
   // Cart & Pricing Verification
   verifyCart: ({ items, promoCode }) =>

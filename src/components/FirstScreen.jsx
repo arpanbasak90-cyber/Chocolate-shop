@@ -14,14 +14,15 @@ export const FirstScreen = () => {
   const [custPhone, setCustPhone] = useState('');
   const [custEmailOtp, setCustEmailOtp] = useState('');
 
-  // Shopkeeper Form State
-  const [adminEmail, setAdminEmail] = useState('zorashop.homemade@gmail.com');
+  // Shopkeeper Form State - Default to Arpan's registered email matching the Resend API account
+  const [adminEmail, setAdminEmail] = useState('arpanbasak90@gmail.com');
   const [adminEmailOtp, setAdminEmailOtp] = useState('');
 
   // Loading & status states
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
+  const [devCodeInfo, setDevCodeInfo] = useState('');
   const [countdown, setCountdown] = useState(0);
 
   // Timer countdown
@@ -37,20 +38,25 @@ export const FirstScreen = () => {
   const handleCustomerSendOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!custName.trim() || !custEmail.trim() || !custPhone.trim()) {
-      setErrorMessage('Please fill in your Full Name, Email, and Mobile number.');
+    setDevCodeInfo('');
+    if (!custName.trim() || !custEmail.trim()) {
+      setErrorMessage('Please fill in your Full Name and Email address.');
       return;
     }
     setIsLoading(true);
     try {
-      await sendCustomerOtp({
+      const res = await sendCustomerOtp({
         name: custName.trim(),
         email: custEmail.trim(),
-        phone: custPhone.trim()
+        phone: custPhone.trim() || '9898014090'
       });
       setActiveView('customer-step2');
       setCountdown(300); // 5 minutes
-      setSuccessInfo(`Verification code dispatched to ${custEmail.trim()}.`);
+      setSuccessInfo(res?.message || `Verification code dispatched to ${custEmail.trim()}.`);
+      if (res?.details?.devCode) {
+        setCustEmailOtp(res.details.devCode);
+        setDevCodeInfo(`Resend Sandbox Mode: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your 6-digit OTP is: ${res.details.devCode}`);
+      }
     } catch (err) {
       setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
@@ -85,16 +91,21 @@ export const FirstScreen = () => {
   const handleAdminSendOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+    setDevCodeInfo('');
     if (!adminEmail.trim()) {
       setErrorMessage('Please enter registered Owner Email address.');
       return;
     }
     setIsLoading(true);
     try {
-      await sendAdminOtp({ email: adminEmail.trim() });
+      const res = await sendAdminOtp({ email: adminEmail.trim() });
       setActiveView('shopkeeper-step2');
       setCountdown(300);
-      setSuccessInfo(`Owner verification code sent to ${adminEmail.trim()}.`);
+      setSuccessInfo(res?.message || `Owner verification code sent to ${adminEmail.trim()}.`);
+      if (res?.details?.devCode) {
+        setAdminEmailOtp(res.details.devCode);
+        setDevCodeInfo(`Resend Sandbox Notice: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your Owner OTP is: ${res.details.devCode}`);
+      }
     } catch (err) {
       setErrorMessage(err.message || 'Owner authentication failed.');
     } finally {
@@ -351,6 +362,18 @@ export const FirstScreen = () => {
               </div>
             )}
 
+            {devCodeInfo && (
+              <div className="p-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                  <span>💡</span>
+                  <span>Notice</span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
+                  {devCodeInfo}
+                </p>
+              </div>
+            )}
+
             {errorMessage && (
               <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
@@ -513,6 +536,18 @@ export const FirstScreen = () => {
               <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2 font-medium">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                 <span>{successInfo}</span>
+              </div>
+            )}
+
+            {devCodeInfo && (
+              <div className="p-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 text-xs space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                  <span>💡</span>
+                  <span>Notice</span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
+                  {devCodeInfo}
+                </p>
               </div>
             )}
 

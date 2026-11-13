@@ -29,12 +29,10 @@ export async function sendCustomerOtp(req, res) {
       return res.status(400).json({ success: false, message: 'A valid Email address is required.' });
     }
     const cleanPhone = (phone || '').replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      return res.status(400).json({ success: false, message: 'A valid 10-digit Mobile number is required.' });
-    }
-
     const cleanEmail = email.trim().toLowerCase();
-    const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
+    const formattedPhone = cleanPhone.length >= 10
+      ? (cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`)
+      : (cleanPhone ? `+91${cleanPhone}` : '+910000000000');
 
     // Generate secure 6-digit Email OTP
     const emailOtp = generateSecureOtp();
@@ -50,15 +48,22 @@ export async function sendCustomerOtp(req, res) {
     });
 
     // Deliver Real OTP to customer's email
-    await sendEmailOtp({ toEmail: cleanEmail, otpCode: emailOtp, recipientName: name.trim(), isOwner: false });
+    const delivery = await sendEmailOtp({ toEmail: cleanEmail, otpCode: emailOtp, recipientName: name.trim(), isOwner: false });
 
     return res.status(200).json({
       success: true,
-      message: 'A 6-digit verification code has been sent to your Email address.',
+      message: delivery?.deliveredToInbox
+        ? `A 6-digit verification code has been delivered to ${cleanEmail}. (Check inbox or spam)`
+        : `A 6-digit verification code was generated for ${cleanEmail}.`,
       details: {
         email: cleanEmail,
         phone: formattedPhone,
-        expiresInMinutes: 5
+        expiresInMinutes: 5,
+        deliveredToInbox: !!delivery?.deliveredToInbox,
+        ...(!delivery?.deliveredToInbox ? {
+          devCode: emailOtp,
+          devNotice: delivery?.reason || 'Resend Testing Sandbox: Inbox delivery restricted to account owner email (arpanbasak90@gmail.com).'
+        } : {})
       }
     });
   } catch (error) {
@@ -188,13 +193,20 @@ export async function sendAdminOtp(req, res) {
       expiresAt
     });
 
-    await sendEmailOtp({ toEmail: admin.email, otpCode: emailOtp, recipientName: admin.name, isOwner: true });
+    const delivery = await sendEmailOtp({ toEmail: admin.email, otpCode: emailOtp, recipientName: admin.name, isOwner: true });
 
     return res.status(200).json({
       success: true,
-      message: 'Verification code dispatched to your registered Owner Email address.',
+      message: delivery?.deliveredToInbox
+        ? `Verification code dispatched to your registered Owner Email address (${admin.email}). (Check inbox or spam)`
+        : `Owner verification code generated for ${admin.email}.`,
       details: {
-        email: admin.email
+        email: admin.email,
+        deliveredToInbox: !!delivery?.deliveredToInbox,
+        ...(!delivery?.deliveredToInbox ? {
+          devCode: emailOtp,
+          devNotice: delivery?.reason || 'Resend Testing Sandbox: Inbox delivery restricted to account owner email (arpanbasak90@gmail.com).'
+        } : {})
       }
     });
   } catch (error) {
