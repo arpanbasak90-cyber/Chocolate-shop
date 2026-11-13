@@ -148,26 +148,31 @@ app.use((err, req, res, next) => {
 // Auto-seed initial owner accounts if none exist
 async function bootstrapInitialOwner() {
   try {
-    const existingAdmin1 = await db.findAdminByEmail('zorashop.homemade@gmail.com');
-    if (!existingAdmin1) {
-      await db.createAdminUser({
-        name: 'Drashti Bhatt',
-        email: 'zorashop.homemade@gmail.com',
-        phone: '+919898014090',
-        role: 'OWNER'
-      });
-      console.log('👑 Default Owner initialized: zorashop.homemade@gmail.com (+91 98980 14090)');
-    }
+    const defaultOwners = [
+      { name: 'Arpan Basak', email: 'arpanbasak90@gmail.com', phone: '+916289760577' },
+      { name: 'Abhijit Saha', email: 'abhijitsaha23485@gmail.com', phone: '+916289760577' },
+      { name: 'Drashti Bhatt', email: 'zorashop.homemade@gmail.com', phone: '+919898014090' }
+    ];
 
-    const existingAdmin2 = await db.findAdminByEmail('arpanbasak90@gmail.com');
-    if (!existingAdmin2) {
-      await db.createAdminUser({
-        name: 'Arpan Basak',
-        email: 'arpanbasak90@gmail.com',
-        phone: '+916289760577',
-        role: 'OWNER'
-      });
-      console.log('👑 Owner initialized: arpanbasak90@gmail.com (+91 6289760577)');
+    const allOwnerEmails = Array.from(new Set([
+      ...defaultOwners.map(o => o.email.toLowerCase()),
+      ...(config.ownerEmails || [])
+    ]));
+
+    for (const email of allOwnerEmails) {
+      const existing = await db.findAdminByEmail(email);
+      if (!existing) {
+        const foundDefault = defaultOwners.find(o => o.email.toLowerCase() === email);
+        const name = foundDefault?.name || (email.includes('abhijit') ? 'Abhijit Saha' : (email.includes('arpan') ? 'Arpan Basak' : 'Store Owner'));
+        const phone = foundDefault?.phone || '+916289760577';
+        await db.createAdminUser({
+          name,
+          email,
+          phone,
+          role: 'OWNER'
+        });
+        console.log(`👑 Owner initialized: ${email} (${name})`);
+      }
     }
   } catch (err) {
     console.error('Owner bootstrap error:', err);

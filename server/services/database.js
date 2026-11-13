@@ -58,6 +58,16 @@ function getInitialData() {
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'admin-3',
+        name: 'Abhijit Saha',
+        email: 'abhijitsaha23485@gmail.com',
+        phone: '+916289760577',
+        role: 'OWNER',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ],
     otps: [],

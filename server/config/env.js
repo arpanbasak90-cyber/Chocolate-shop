@@ -42,6 +42,11 @@ export const config = {
     fast2smsApiKey: process.env.FAST2SMS_API_KEY || ''
   },
 
+  ownerEmails: (process.env.OWNER_EMAILS || 'arpanbasak90@gmail.com,abhijitsaha23485@gmail.com,zorashop.homemade@gmail.com')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean),
+
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID || '',
     keySecret: process.env.RAZORPAY_KEY_SECRET || '',
@@ -52,7 +57,7 @@ export const config = {
     name: process.env.SHOP_NAME || 'ZORA SHOP',
     tagline: process.env.SHOP_TAGLINE || 'Sweetness in Every Bite!',
     whatsappNumber: process.env.WHATSAPP_PHONE || process.env.SHOP_WHATSAPP_NUMBER || '+91 6289760577',
-    contactEmail: process.env.SHOP_CONTACT_EMAIL || 'zorashop.homemade@gmail.com',
+    contactEmail: process.env.SHOP_CONTACT_EMAIL || 'abhijitsaha23485@gmail.com',
     address: process.env.SHOP_ADDRESS || 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
     deliveryFeeThreshold: 500,
     standardDeliveryFee: 40
