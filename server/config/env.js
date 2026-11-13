@@ -31,7 +31,7 @@ export const config = {
   },
 
   resend: {
-    apiKey: process.env.RESEND_API_KEY || Buffer.from('cmVfWkN4b1B1RHBfRFM5VEx3SzNqYlJ0OHA1RFpLZEFDcWF1', 'base64').toString('utf8'),
+    apiKey: process.env.RESEND_API_KEY || Buffer.from('cmVfZVVQUmdkeWRfTENXWVNQOUNOUmhoa2JZOWZWSjVwVG51', 'base64').toString('utf8'),
     from: process.env.RESEND_FROM || 'ZORA SHOP <onboarding@resend.dev>'
   },
 
@@ -42,7 +42,7 @@ export const config = {
     fast2smsApiKey: process.env.FAST2SMS_API_KEY || ''
   },
 
-  ownerEmails: (process.env.OWNER_EMAILS || 'arpanbasak90@gmail.com,abhijitsaha23485@gmail.com,zorashop.homemade@gmail.com')
+  ownerEmails: (process.env.OWNER_EMAILS || 'abhijitsaha23485@gmail.com')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean),

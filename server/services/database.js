@@ -40,27 +40,7 @@ function getInitialData() {
     customers: [],
     adminUsers: [
       {
-        id: 'admin-1',
-        name: 'Drashti Bhatt',
-        email: 'zorashop.homemade@gmail.com',
-        phone: '+919898014090',
-        role: 'OWNER',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'admin-2',
-        name: 'Arpan Basak',
-        email: 'arpanbasak90@gmail.com',
-        phone: '+916289760577',
-        role: 'OWNER',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: 'admin-3',
+        id: 'admin-owner',
         name: 'Abhijit Saha',
         email: 'abhijitsaha23485@gmail.com',
         phone: '+916289760577',

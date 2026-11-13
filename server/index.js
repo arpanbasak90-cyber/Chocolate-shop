@@ -148,30 +148,20 @@ app.use((err, req, res, next) => {
 // Auto-seed initial owner accounts if none exist
 async function bootstrapInitialOwner() {
   try {
-    const defaultOwners = [
-      { name: 'Arpan Basak', email: 'arpanbasak90@gmail.com', phone: '+916289760577' },
-      { name: 'Abhijit Saha', email: 'abhijitsaha23485@gmail.com', phone: '+916289760577' },
-      { name: 'Drashti Bhatt', email: 'zorashop.homemade@gmail.com', phone: '+919898014090' }
-    ];
+    const activeOwnerEmails = (config.ownerEmails && config.ownerEmails.length > 0)
+      ? config.ownerEmails
+      : ['abhijitsaha23485@gmail.com'];
 
-    const allOwnerEmails = Array.from(new Set([
-      ...defaultOwners.map(o => o.email.toLowerCase()),
-      ...(config.ownerEmails || [])
-    ]));
-
-    for (const email of allOwnerEmails) {
+    for (const email of activeOwnerEmails) {
       const existing = await db.findAdminByEmail(email);
       if (!existing) {
-        const foundDefault = defaultOwners.find(o => o.email.toLowerCase() === email);
-        const name = foundDefault?.name || (email.includes('abhijit') ? 'Abhijit Saha' : (email.includes('arpan') ? 'Arpan Basak' : 'Store Owner'));
-        const phone = foundDefault?.phone || '+916289760577';
         await db.createAdminUser({
-          name,
+          name: 'Abhijit Saha',
           email,
-          phone,
+          phone: '+916289760577',
           role: 'OWNER'
         });
-        console.log(`👑 Owner initialized: ${email} (${name})`);
+        console.log(`👑 Store Owner initialized: ${email} (Abhijit Saha)`);
       }
     }
   } catch (err) {

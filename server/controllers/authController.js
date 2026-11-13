@@ -169,17 +169,24 @@ export async function sendAdminOtp(req, res) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    let admin = await db.findAdminByEmail(cleanEmail);
 
-    if (!admin && config.ownerEmails.includes(cleanEmail)) {
-      const name = cleanEmail.includes('abhijit') ? 'Abhijit Saha' : (cleanEmail.includes('arpan') ? 'Arpan Basak' : 'Store Owner');
+    // Strictly enforce authorized store owner emails
+    if (!config.ownerEmails.includes(cleanEmail)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized email. Only registered shopkeeper accounts can request admin verification.'
+      });
+    }
+
+    let admin = await db.findAdminByEmail(cleanEmail);
+    if (!admin) {
       admin = await db.createAdminUser({
-        name,
+        name: 'Abhijit Saha',
         email: cleanEmail,
         phone: '+916289760577',
         role: 'OWNER'
       });
-      console.log(`👑 Auto-provisioned owner on demand: ${cleanEmail} (${name})`);
+      console.log(`👑 Auto-provisioned owner on demand: ${cleanEmail}`);
     }
 
     if (!admin || !admin.isActive) {
@@ -230,11 +237,15 @@ export async function verifyAdminOtp(req, res) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    if (!config.ownerEmails.includes(cleanEmail)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized owner account.' });
+    }
+
     let admin = await db.findAdminByEmail(cleanEmail);
-    if (!admin && config.ownerEmails.includes(cleanEmail)) {
-      const name = cleanEmail.includes('abhijit') ? 'Abhijit Saha' : (cleanEmail.includes('arpan') ? 'Arpan Basak' : 'Store Owner');
+    if (!admin) {
       admin = await db.createAdminUser({
-        name,
+        name: 'Abhijit Saha',
         email: cleanEmail,
         phone: '+916289760577',
         role: 'OWNER'

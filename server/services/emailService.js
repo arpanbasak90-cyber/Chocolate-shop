@@ -118,39 +118,6 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Chocolat
       } else {
         const errorReason = data.message || res.statusText || 'Resend delivery rejected';
         console.warn(`⚠️ Resend dispatch notice for ${toEmail}: ${errorReason}`);
-
-        // If Resend free sandbox restricts delivery to the account owner, forward a copy to primary owner (arpanbasak90@gmail.com)
-        if (data.message && data.message.includes('only send testing emails to your own email address') && toEmail.toLowerCase() !== 'arpanbasak90@gmail.com') {
-          try {
-            const fallbackRes = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${config.resend.apiKey}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                from: config.resend.from || 'onboarding@resend.dev',
-                to: 'arpanbasak90@gmail.com',
-                subject: `🔐 ZORA SHOP Owner OTP for ${recipientName} (${toEmail}): ${otpCode}`,
-                html: htmlContent
-              })
-            });
-            const fbData = await fallbackRes.json().catch(() => ({}));
-            if (fallbackRes.ok && fbData.id) {
-              console.log(`✉️ Resend sandbox copy dispatched to arpanbasak90@gmail.com for ${toEmail} (ID: ${fbData.id})`);
-              return {
-                success: true,
-                provider: 'Resend',
-                id: fbData.id,
-                deliveredToInbox: true,
-                forwardedTo: 'arpanbasak90@gmail.com'
-              };
-            }
-          } catch (fbErr) {
-            console.error('Fallback email dispatch error:', fbErr.message);
-          }
-        }
-
         return {
           success: true,
           provider: 'Resend',
