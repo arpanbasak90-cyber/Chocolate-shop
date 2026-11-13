@@ -48,6 +48,28 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serverless / Rewrite URL normalization and cold-start bootstrap
+let isBootstrapped = false;
+app.use(async (req, res, next) => {
+  if (req.headers['x-matched-path'] && (req.url.startsWith('/api/index.js') || req.url === '/api' || req.url === '/api/')) {
+    req.url = req.headers['x-matched-path'];
+  } else if (req.url.startsWith('/api/index.js')) {
+    req.url = req.url.replace('/api/index.js', '') || '/';
+  } else if (req.url.startsWith('/api/index')) {
+    req.url = req.url.replace('/api/index', '') || '/';
+  }
+
+  if (!isBootstrapped) {
+    isBootstrapped = true;
+    try {
+      await bootstrapInitialOwner();
+    } catch (e) {
+      console.warn('Bootstrap owner notice:', e.message);
+    }
+  }
+  next();
+});
+
 if (config.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }

@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
 import { INITIAL_PRODUCTS, CATEGORIES } from '../../src/data/products.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,27 +10,86 @@ const DATA_DIR = isServerless ? '/tmp/zora-data' : path.join(__dirname, '../data
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SOURCE_DB_FILE = path.join(__dirname, '../data/db.json');
 
-// Initialize Prisma
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
-});
-
+// Optional dynamic Prisma client
+let prisma = null;
 let isPrismaConnected = false;
 
-// Attempt PostgreSQL connection via Prisma
+// Attempt PostgreSQL connection via Prisma ONLY if a valid PostgreSQL DATABASE_URL is provided
 async function testPrismaConnection() {
+  if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('postgres')) {
+    isPrismaConnected = false;
+    return;
+  }
   try {
+    const { PrismaClient } = await import('@prisma/client');
+    prisma = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
+    });
     await prisma.$connect();
     isPrismaConnected = true;
     console.log('✅ Connected to PostgreSQL Database via Prisma.');
   } catch (err) {
     isPrismaConnected = false;
-    console.warn('ℹ️ PostgreSQL not reachable at DATABASE_URL. Running with local persistent database.');
-    console.warn(`   Prisma connection error: ${err.message?.split('\n')[0]}`);
-    console.warn('   To connect to live PostgreSQL: set valid DATABASE_URL in server/.env and run: npm run prisma:push');
+    console.warn('ℹ️ PostgreSQL not reachable. Running with persistent database engine.');
   }
 }
-testPrismaConnection();
+testPrismaConnection().catch(() => {});
+
+function getInitialData() {
+  return {
+    customers: [],
+    adminUsers: [
+      {
+        id: 'admin-1',
+        name: 'Drashti Bhatt',
+        email: 'zorashop.homemade@gmail.com',
+        phone: '+919898014090',
+        role: 'OWNER',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'admin-2',
+        name: 'Arpan Basak',
+        email: 'arpanbasak90@gmail.com',
+        phone: '+916289760577',
+        role: 'OWNER',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ],
+    otps: [],
+    categories: CATEGORIES.filter(c => c !== 'All Chocolates').map(c => ({
+      id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      name: c,
+      slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    })),
+    products: INITIAL_PRODUCTS.map(p => ({
+      ...p,
+      ingredients: JSON.stringify(p.ingredients || []),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    })),
+    orders: [],
+    payments: [],
+    statusHistory: [],
+    settings: {
+      id: 'default',
+      shopName: 'ZORA SHOP',
+      tagline: 'Sweetness in Every Bite!',
+      whatsappNumber: '+91 6289760577',
+      contactEmail: 'zorashop.homemade@gmail.com',
+      shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
+      deliveryFeeThreshold: 500,
+      standardDeliveryFee: 40,
+      isCodEnabled: true,
+      isOnlinePaymentEnabled: true,
+      updatedAt: new Date().toISOString()
+    }
+  };
+}
 
 // Local fallback DB initialization
 function initLocalDb() {
@@ -46,38 +104,7 @@ function initLocalDb() {
         return;
       }
 
-      const initialData = {
-        customers: [],
-        adminUsers: [],
-        otps: [],
-        categories: CATEGORIES.filter(c => c !== 'All Chocolates').map(c => ({
-          id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-          name: c,
-          slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        })),
-        products: INITIAL_PRODUCTS.map(p => ({
-          ...p,
-          ingredients: JSON.stringify(p.ingredients || []),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })),
-        orders: [],
-        payments: [],
-        statusHistory: [],
-        settings: {
-          id: 'default',
-          shopName: 'ZORA SHOP',
-          tagline: 'Sweetness in Every Bite!',
-          whatsappNumber: '+91 6289760577',
-          contactEmail: 'zorashop.homemade@gmail.com',
-          shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
-          deliveryFeeThreshold: 500,
-          standardDeliveryFee: 40,
-          isCodEnabled: true,
-          isOnlinePaymentEnabled: true,
-          updatedAt: new Date().toISOString()
-        }
-      };
+      const initialData = getInitialData();
       fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf8');
     }
   } catch (err) {
@@ -92,22 +119,26 @@ function readLocalDb() {
   try {
     initLocalDb();
     if (fs.existsSync(DB_FILE)) {
-      memDb = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-      return memDb;
+      const content = fs.readFileSync(DB_FILE, 'utf8');
+      if (content && content.trim()) {
+        memDb = JSON.parse(content);
+        return memDb;
+      }
     }
   } catch (err) {
-    console.error('Error reading local db file:', err);
+    console.warn('Error reading local db file, falling back to in-memory store:', err.message);
   }
-  return { customers: [], adminUsers: [], otps: [], products: [], orders: [], payments: [] };
+  memDb = getInitialData();
+  return memDb;
 }
 
 function writeLocalDb(data) {
+  memDb = data;
   try {
-    memDb = data;
     initLocalDb();
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error writing local db file:', err.message);
+    console.warn('Notice writing local db file:', err.message);
   }
 }
 
@@ -115,7 +146,9 @@ function writeLocalDb(data) {
 // UNIFIED DATABASE SERVICE (Dual Engine: PostgreSQL / Local Persistent Fallback)
 // ============================================================================
 export const db = {
-  prisma,
+  get prisma() {
+    return prisma;
+  },
   isPostgresReady: () => isPrismaConnected,
 
   // 1. PRODUCTS
@@ -401,7 +434,11 @@ export const db = {
     }
 
     const local = readLocalDb();
-    return (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail) || null;
+    const admin = (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail) || null;
+    if (admin && admin.isActive === undefined) {
+      admin.isActive = true;
+    }
+    return admin;
   },
 
   async createAdminUser({ name, email, phone, role = 'OWNER', passwordHash = null }) {
