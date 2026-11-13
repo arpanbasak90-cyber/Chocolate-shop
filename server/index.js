@@ -3,8 +3,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
 import { db } from './services/database.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.resolve(__dirname, '../dist');
 
 // Route handlers
 import authRoutes from './routes/authRoutes.js';
@@ -77,6 +84,26 @@ app.use('/payments', paymentRoutes);
 
 app.use('/api/admin', adminRoutes);
 app.use('/admin', adminRoutes);
+
+// Serve static frontend assets from dist in production
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/auth') ||
+      req.path.startsWith('/products') ||
+      req.path.startsWith('/cart') ||
+      req.path.startsWith('/orders') ||
+      req.path.startsWith('/payments') ||
+      req.path.startsWith('/admin') ||
+      req.path.startsWith('/health')
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // JSON 404 Handler for all API routes (ensures frontend always receives a structured JSON message instead of HTML)
 app.use(['/api', '/api/*', '/auth', '/auth/*', '/products', '/products/*', '/cart', '/cart/*', '/orders', '/orders/*', '/payments', '/payments/*', '/admin', '/admin/*'], (req, res) => {
