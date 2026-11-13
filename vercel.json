@@ -4,6 +4,38 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/products/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/cart/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/orders/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/payments/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

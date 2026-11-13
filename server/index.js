@@ -152,15 +152,27 @@ async function bootstrapInitialOwner() {
   }
 }
 
-// Start Server
-app.listen(config.port, async () => {
-  await bootstrapInitialOwner();
-  console.log(`\n🍫 ══════════════════════════════════════════════════════════════`);
-  console.log(`🚀 ZORA SHOP Production Backend running on port ${config.port}`);
-  console.log(`🌐 API Base URL: http://localhost:${config.port}/api`);
-  console.log(`📦 Database: ${db.isPostgresReady() ? 'PostgreSQL (Prisma)' : 'Local Persistent Engine'}`);
-  console.log(`🔐 Email OTP Auth: Active (Resend Email Verification)`);
-  console.log(`💳 Payment Gateway: Razorpay Ready`);
-  console.log(`══════════════════════════════════════════════════════════════\n`);
-});
+export { app, bootstrapInitialOwner };
+export default app;
+
+// Start standalone HTTP server only when running directly (not imported as a module or on Vercel)
+const isDirectRun = Boolean(
+  process.argv[1] &&
+  !process.env.VERCEL &&
+  !process.env.AWS_LAMBDA_FUNCTION_NAME &&
+  path.resolve(process.argv[1]).toLowerCase().endsWith(path.join('server', 'index.js').toLowerCase())
+);
+
+if (isDirectRun) {
+  app.listen(config.port, async () => {
+    await bootstrapInitialOwner();
+    console.log(`\n🍫 ══════════════════════════════════════════════════════════════`);
+    console.log(`🚀 ZORA SHOP Production Backend running on port ${config.port}`);
+    console.log(`🌐 API Base URL: http://localhost:${config.port}/api`);
+    console.log(`📦 Database: ${db.isPostgresReady() ? 'PostgreSQL (Prisma)' : 'Local Persistent Engine'}`);
+    console.log(`🔐 Email OTP Auth: Active (Resend Email Verification)`);
+    console.log(`💳 Payment Gateway: Razorpay Ready`);
+    console.log(`══════════════════════════════════════════════════════════════\n`);
+  });
+}
 

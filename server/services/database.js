@@ -6,8 +6,10 @@ import { INITIAL_PRODUCTS, CATEGORIES } from '../../src/data/products.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, '../data');
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+const DATA_DIR = isServerless ? '/tmp/zora-data' : path.join(__dirname, '../data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+const SOURCE_DB_FILE = path.join(__dirname, '../data/db.json');
 
 // Initialize Prisma
 const prisma = new PrismaClient({
@@ -33,64 +35,79 @@ testPrismaConnection();
 
 // Local fallback DB initialization
 function initLocalDb() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
 
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = {
-      customers: [],
-      adminUsers: [],
-      otps: [],
-      categories: CATEGORIES.filter(c => c !== 'All Chocolates').map(c => ({
-        id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        name: c,
-        slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      })),
-      products: INITIAL_PRODUCTS.map(p => ({
-        ...p,
-        ingredients: JSON.stringify(p.ingredients || []),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      })),
-      orders: [],
-      payments: [],
-      statusHistory: [],
-      settings: {
-        id: 'default',
-        shopName: 'ZORA SHOP',
-        tagline: 'Sweetness in Every Bite!',
-        whatsappNumber: '+91 98980 14090',
-        contactEmail: 'zorashop.homemade@gmail.com',
-        shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
-        deliveryFeeThreshold: 500,
-        standardDeliveryFee: 40,
-        isCodEnabled: true,
-        isOnlinePaymentEnabled: true,
-        updatedAt: new Date().toISOString()
+    if (!fs.existsSync(DB_FILE)) {
+      if (isServerless && fs.existsSync(SOURCE_DB_FILE)) {
+        fs.copyFileSync(SOURCE_DB_FILE, DB_FILE);
+        return;
       }
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf8');
+
+      const initialData = {
+        customers: [],
+        adminUsers: [],
+        otps: [],
+        categories: CATEGORIES.filter(c => c !== 'All Chocolates').map(c => ({
+          id: `cat-${c.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          name: c,
+          slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+        })),
+        products: INITIAL_PRODUCTS.map(p => ({
+          ...p,
+          ingredients: JSON.stringify(p.ingredients || []),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })),
+        orders: [],
+        payments: [],
+        statusHistory: [],
+        settings: {
+          id: 'default',
+          shopName: 'ZORA SHOP',
+          tagline: 'Sweetness in Every Bite!',
+          whatsappNumber: '+91 6289760577',
+          contactEmail: 'zorashop.homemade@gmail.com',
+          shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
+          deliveryFeeThreshold: 500,
+          standardDeliveryFee: 40,
+          isCodEnabled: true,
+          isOnlinePaymentEnabled: true,
+          updatedAt: new Date().toISOString()
+        }
+      };
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf8');
+    }
+  } catch (err) {
+    console.warn('initLocalDb notice:', err.message);
   }
 }
 
-initLocalDb();
+let memDb = null;
 
 function readLocalDb() {
+  if (memDb) return memDb;
   try {
     initLocalDb();
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    if (fs.existsSync(DB_FILE)) {
+      memDb = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      return memDb;
+    }
   } catch (err) {
     console.error('Error reading local db file:', err);
-    return { customers: [], adminUsers: [], otps: [], products: [], orders: [], payments: [] };
   }
+  return { customers: [], adminUsers: [], otps: [], products: [], orders: [], payments: [] };
 }
 
 function writeLocalDb(data) {
   try {
+    memDb = data;
+    initLocalDb();
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error writing local db file:', err);
+    console.error('Error writing local db file:', err.message);
   }
 }
 
