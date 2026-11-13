@@ -53,10 +53,7 @@ export const FirstScreen = () => {
       setActiveView('customer-step2');
       setCountdown(300); // 5 minutes
       setSuccessInfo(res?.message || `Verification code dispatched to ${custEmail.trim()}.`);
-      if (res?.details?.devCode) {
-        setCustEmailOtp(res.details.devCode);
-        setDevCodeInfo(`Resend Sandbox Mode: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your 6-digit OTP is: ${res.details.devCode}`);
-      }
+      setCustEmailOtp('');
     } catch (err) {
       setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
@@ -102,10 +99,7 @@ export const FirstScreen = () => {
       setActiveView('shopkeeper-step2');
       setCountdown(300);
       setSuccessInfo(res?.message || `Owner verification code sent to ${adminEmail.trim()}.`);
-      if (res?.details?.devCode) {
-        setAdminEmailOtp(res.details.devCode);
-        setDevCodeInfo(`Resend Sandbox Notice: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your Owner OTP is: ${res.details.devCode}`);
-      }
+      setAdminEmailOtp('');
     } catch (err) {
       setErrorMessage(err.message || 'Owner authentication failed.');
     } finally {
@@ -362,17 +356,6 @@ export const FirstScreen = () => {
               </div>
             )}
 
-            {devCodeInfo && (
-              <div className="p-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 text-xs space-y-1">
-                <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                  <span>💡</span>
-                  <span>Notice</span>
-                </div>
-                <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
-                  {devCodeInfo}
-                </p>
-              </div>
-            )}
 
             {errorMessage && (
               <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
@@ -539,17 +522,6 @@ export const FirstScreen = () => {
               </div>
             )}
 
-            {devCodeInfo && (
-              <div className="p-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-950 text-xs space-y-1">
-                <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                  <span>💡</span>
-                  <span>Notice</span>
-                </div>
-                <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
-                  {devCodeInfo}
-                </p>
-              </div>
-            )}
 
             {errorMessage && (
               <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">

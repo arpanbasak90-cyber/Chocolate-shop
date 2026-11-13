@@ -76,10 +76,7 @@ export const CustomerAccountPage = () => {
       });
       setAuthStep(2);
       setCountdown(300);
-      if (res?.details?.devCode) {
-        setEmailOtp(res.details.devCode);
-        setDevCodeInfo(`Resend Sandbox Notice: Direct email delivery is restricted by Resend to arpanbasak90@gmail.com. For testing with this address, your OTP is: ${res.details.devCode}`);
-      }
+      setEmailOtp('');
     } catch (err) {
       setErrorMessage(err.message || 'Failed to dispatch verification code.');
     } finally {
@@ -175,17 +172,6 @@ export const CustomerAccountPage = () => {
                   </div>
                 )}
 
-                {devCodeInfo && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-1">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                      <span>💡</span>
-                      <span>Notice</span>
-                    </div>
-                    <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
-                      {devCodeInfo}
-                    </p>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
@@ -283,17 +269,6 @@ export const CustomerAccountPage = () => {
                   </div>
                 )}
 
-                {devCodeInfo && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs space-y-1">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-900">
-                      <span>💡</span>
-                      <span>Notice</span>
-                    </div>
-                    <p className="text-[11px] text-amber-900 leading-relaxed font-mono">
-                      {devCodeInfo}
-                    </p>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">

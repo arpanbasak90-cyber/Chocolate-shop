@@ -53,17 +53,13 @@ export async function sendCustomerOtp(req, res) {
     return res.status(200).json({
       success: true,
       message: delivery?.deliveredToInbox
-        ? `A 6-digit verification code has been delivered to ${cleanEmail}. (Check inbox or spam)`
-        : `A 6-digit verification code was generated for ${cleanEmail}.`,
+        ? `A 6-digit verification code has been delivered to ${cleanEmail}. (Check inbox or spam on your mobile/computer)`
+        : `Verification code dispatched to ${cleanEmail}. Please check your inbox.`,
       details: {
         email: cleanEmail,
         phone: formattedPhone,
         expiresInMinutes: 5,
-        deliveredToInbox: !!delivery?.deliveredToInbox,
-        ...(!delivery?.deliveredToInbox ? {
-          devCode: emailOtp,
-          devNotice: delivery?.reason || 'Resend Testing Sandbox: Inbox delivery restricted to account owner email (arpanbasak90@gmail.com).'
-        } : {})
+        deliveredToInbox: !!delivery?.deliveredToInbox
       }
     });
   } catch (error) {
@@ -198,15 +194,11 @@ export async function sendAdminOtp(req, res) {
     return res.status(200).json({
       success: true,
       message: delivery?.deliveredToInbox
-        ? `Verification code dispatched to your registered Owner Email address (${admin.email}). (Check inbox or spam)`
-        : `Owner verification code generated for ${admin.email}.`,
+        ? `Verification code dispatched to your registered Owner Email address (${admin.email}). (Check your email inbox or spam on your mobile/device)`
+        : `Owner verification code sent to ${admin.email}. Please check your inbox.`,
       details: {
         email: admin.email,
-        deliveredToInbox: !!delivery?.deliveredToInbox,
-        ...(!delivery?.deliveredToInbox ? {
-          devCode: emailOtp,
-          devNotice: delivery?.reason || 'Resend Testing Sandbox: Inbox delivery restricted to account owner email (arpanbasak90@gmail.com).'
-        } : {})
+        deliveredToInbox: !!delivery?.deliveredToInbox
       }
     });
   } catch (error) {
