@@ -216,8 +216,7 @@ export async function sendAdminOtp(req, res) {
         : `Owner verification code sent to ${admin.email}. Please check your inbox.`,
       details: {
         email: admin.email,
-        deliveredToInbox: !!delivery?.deliveredToInbox,
-        ...(delivery?.reason ? { deliveryNotice: delivery.reason } : {})
+        deliveredToInbox: !!delivery?.deliveredToInbox
       }
     });
   } catch (error) {

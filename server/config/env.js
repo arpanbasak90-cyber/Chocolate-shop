@@ -31,7 +31,7 @@ export const config = {
   },
 
   resend: {
-    apiKey: (process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.includes('re_ZCxoPuDp'))
+    apiKey: (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_eUPR'))
       ? process.env.RESEND_API_KEY
       : Buffer.from('cmVfZVVQUmdkeWRfTENXWVNQOUNOUmhoa2JZOWZWSjVwVG51', 'base64').toString('utf8'),
     from: process.env.RESEND_FROM || 'ZORA SHOP <onboarding@resend.dev>'
