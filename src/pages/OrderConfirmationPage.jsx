@@ -91,7 +91,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8 animate-fadeIn">
-      
+
       {/* Top Success Banner */}
       <div className="bg-gradient-to-br from-chocolate-950 via-chocolate-900 to-chocolate-950 text-cream-100 rounded-3xl p-8 sm:p-12 text-center border-2 border-gold-500/40 shadow-2xl relative overflow-hidden gold-glow">
         <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-caramel-500 to-gold-400 p-1 mb-5 flex items-center justify-center shadow-lg">
@@ -130,7 +130,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
 
       {/* Main Order Details Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-cream-300 shadow-md space-y-6">
-        
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-cream-200 gap-3">
           <div>
             <h3 className="font-serif text-lg font-bold text-chocolate-950">

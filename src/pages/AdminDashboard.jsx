@@ -176,13 +176,13 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
 
   return (
     <div className="min-h-screen bg-[#1c0c07] text-cream-100 flex flex-col md:flex-row font-sans">
-      
+
       {/* ══════════════════════════════════════════════════════════════════════════
           SIDEBAR NAVIGATION (Chocolate Themed)
       ══════════════════════════════════════════════════════════════════════════ */}
       <aside className="w-full md:w-64 bg-[#2b130a] border-r border-[#421d10] p-6 flex flex-col justify-between shrink-0">
         <div className="space-y-6">
-          
+
           {/* Logo & Shopkeeper identity */}
           <div className="flex items-center gap-3 pb-6 border-b border-[#421d10]">
             <div className="w-11 h-11 rounded-2xl bg-[#3c1b11] border border-gold-500/40 text-gold-400 flex items-center justify-center text-2xl shadow-md">
@@ -214,11 +214,10 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-all ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-left transition-all ${isActive
                       ? 'bg-gradient-to-r from-caramel-600 to-caramel-700 text-white font-bold shadow-md'
                       : 'text-stone-300 hover:bg-[#3c1b11] hover:text-white'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4 shrink-0 text-gold-300" />
                   <span>{tab.label}</span>
@@ -253,11 +252,11 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
           MAIN CONTENT AREA
       ══════════════════════════════════════════════════════════════════════════ */}
       <main className="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto max-h-screen">
-        
+
         {/* TAB 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-fadeIn">
-            
+
             {/* Header */}
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-caramel-400">
@@ -273,7 +272,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
 
             {/* 6 KEY STATISTICS CARDS */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              
+
               {/* Stat 1: Registered Customers */}
               <div className="bg-[#2b130a] rounded-2xl p-4 border border-[#421d10] space-y-1">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
@@ -427,7 +426,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         {/* TAB 2: ORDER MANAGEMENT (Section 11 Requirement) */}
         {activeTab === 'orders' && (
           <div className="space-y-6 animate-fadeIn">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#421d10] gap-4">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-white">
@@ -457,11 +456,10 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 <button
                   key={st}
                   onClick={() => setOrderStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-                    orderStatusFilter === st
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${orderStatusFilter === st
                       ? 'bg-gradient-to-r from-caramel-600 to-caramel-700 text-white font-bold shadow-md'
                       : 'bg-[#2b130a] text-stone-300 hover:bg-[#3c1b11]'
-                  }`}
+                    }`}
                 >
                   {st}
                 </button>
@@ -586,7 +584,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         {/* TAB 3: CUSTOMERS MANAGEMENT (Section 10 Requirement) */}
         {activeTab === 'customers' && (
           <div className="space-y-6 animate-fadeIn">
-            
+
             <div className="pb-3 border-b border-[#421d10]">
               <div className="text-xs font-bold uppercase tracking-wider text-caramel-400">
                 Customer Directory
@@ -677,7 +675,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         {/* TAB 4: PRODUCTS MANAGEMENT (Section 12 Requirement) */}
         {activeTab === 'products' && (
           <div className="space-y-6 animate-fadeIn">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#421d10] gap-4">
               <div>
                 <h2 className="font-serif text-2xl font-bold text-white">
@@ -720,11 +718,10 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                         <button
                           type="button"
                           onClick={() => toggleProductAvailability(prod.id)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition ${
-                            prod.isAvailable
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase transition ${prod.isAvailable
                               ? 'bg-emerald-600 text-white'
                               : 'bg-red-600 text-white'
-                          }`}
+                            }`}
                         >
                           {prod.isAvailable ? 'In Stock' : 'Out of Stock'}
                         </button>
@@ -778,7 +775,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         {/* TAB 5: REVENUE ANALYTICS (Section 13 Requirement) */}
         {activeTab === 'revenue' && (
           <div className="space-y-6 animate-fadeIn">
-            
+
             <div className="pb-3 border-b border-[#421d10]">
               <div className="text-xs font-bold uppercase tracking-wider text-caramel-400">
                 Financial Performance (Production Ledger)
