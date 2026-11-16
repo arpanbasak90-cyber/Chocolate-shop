@@ -110,7 +110,7 @@ export const ShopProvider = ({ children }) => {
           setIsAuthChecking(false);
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // Check Admin Session
       try {
@@ -121,7 +121,7 @@ export const ShopProvider = ({ children }) => {
           setIsAuthChecking(false);
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
 
       setIsAuthChecking(false);
     }
@@ -223,7 +223,7 @@ export const ShopProvider = ({ children }) => {
   const customerLogout = async () => {
     try {
       await api.customerLogout();
-    } catch (e) {}
+    } catch (e) { }
     setCurrentCustomer(null);
     setSessionRole(null);
     addToast('Logged out successfully.');
@@ -274,7 +274,7 @@ export const ShopProvider = ({ children }) => {
   const shopkeeperLogout = async () => {
     try {
       await api.adminLogout();
-    } catch (e) {}
+    } catch (e) { }
     setAdminUser(null);
     setSessionRole(null);
     addToast('Owner session closed.');

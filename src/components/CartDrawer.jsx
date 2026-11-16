@@ -293,7 +293,7 @@ export const CartDrawer = () => {
               </div>
 
               <p className="text-[10px] text-center text-stone-500">
-                🔒 Safe & secure simulated checkout • 100% Homemade Freshness
+                🔒 Safe & secure checkout • 100% Homemade Freshness
               </p>
             </div>
           )}

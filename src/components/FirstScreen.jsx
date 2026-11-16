@@ -100,13 +100,13 @@ export const FirstScreen = () => {
 
   return (
     <div className="min-h-screen bg-[#1c0c07] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden font-sans">
-      
+
       {/* Decorative ambient background glows */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-caramel-600/15 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gold-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-4xl relative z-10 space-y-8 animate-fadeIn">
-        
+
         {/* TOP BRAND HEADER */}
         <div className="rounded-3xl bg-[#3c1b11] border-2 border-[#5a2c1b] p-6 sm:p-8 text-center text-cream-100 shadow-2xl relative overflow-hidden">
           <div className="inline-flex items-center gap-2 mb-2">
@@ -128,7 +128,7 @@ export const FirstScreen = () => {
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === null && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 animate-fadeIn">
-            
+
             {/* CARD 1: CUSTOMER */}
             <div className="bg-[#f2ebd9] rounded-3xl p-8 sm:p-10 border-2 border-[#e6d8be] shadow-xl hover:shadow-2xl hover:border-caramel-400 transition-all duration-300 flex flex-col items-center text-center justify-between group">
               <div className="space-y-4 flex flex-col items-center">

@@ -104,29 +104,64 @@ function initLocalDb() {
 
 let memDb = null;
 
+const SIMULATED_EMAILS = new Set([
+  'aarav.patel@testmail.com',
+  'customertest@gmail.com',
+  'priyasharma@gmail.com',
+  'basakarpan979@gmail.com',
+  'priyanka.sen@demo.com',
+  'rohan.mehta@example.com',
+  'aditya.k@example.com',
+  'rohan.sharma@example.com'
+]);
+
+function sanitizeDb(data) {
+  if (!data) return data;
+  if (Array.isArray(data.customers)) {
+    data.customers = data.customers.filter(c => {
+      const email = (c.email || '').toLowerCase().trim();
+      return email && !SIMULATED_EMAILS.has(email) && !email.endsWith('@testmail.com') && !email.endsWith('@example.com') && !email.endsWith('@demo.com');
+    });
+  }
+  if (Array.isArray(data.orders)) {
+    data.orders = data.orders.filter(o => {
+      const custEmail = (o.customer?.email || '').toLowerCase().trim();
+      const orderNum = (o.orderNumber || '').toUpperCase();
+      const isSimulated = SIMULATED_EMAILS.has(custEmail) ||
+        custEmail.endsWith('@testmail.com') ||
+        custEmail.endsWith('@example.com') ||
+        custEmail.endsWith('@demo.com') ||
+        orderNum === 'ZORA-752333' ||
+        o.id === 'order-1794471167667';
+      return !isSimulated;
+    });
+  }
+  return data;
+}
+
 function readLocalDb() {
-  if (memDb) return memDb;
+  if (memDb) return sanitizeDb(memDb);
   try {
     initLocalDb();
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf8');
       if (content && content.trim()) {
-        memDb = JSON.parse(content);
+        memDb = sanitizeDb(JSON.parse(content));
         return memDb;
       }
     }
   } catch (err) {
     console.warn('Error reading local db file, falling back to in-memory store:', err.message);
   }
-  memDb = getInitialData();
+  memDb = sanitizeDb(getInitialData());
   return memDb;
 }
 
 function writeLocalDb(data) {
-  memDb = data;
+  memDb = sanitizeDb(data);
   try {
     initLocalDb();
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(DB_FILE, JSON.stringify(memDb, null, 2), 'utf8');
   } catch (err) {
     console.warn('Notice writing local db file:', err.message);
   }

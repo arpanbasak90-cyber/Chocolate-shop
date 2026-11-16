@@ -15,7 +15,7 @@ const API_BASE_URL = resolveBaseUrl();
 async function request(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE_URL}${cleanEndpoint}`;
-  
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('zora_auth_token') : null;
 
   const headers = {

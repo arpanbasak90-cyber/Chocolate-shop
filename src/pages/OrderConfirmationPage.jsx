@@ -123,7 +123,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
         <div className="mt-6 text-xs text-caramel-300/90 flex items-center justify-center gap-2">
           <Clock className="w-4 h-4 text-gold-400" />
           <span>
-            <strong>Estimated Delivery:</strong> Within 24-48 Hours (Illustrative Demo Schedule)
+            <strong>Estimated Delivery:</strong> Within 24-48 Hours (Freshly Tempered & Dispatched)
           </span>
         </div>
       </div>
@@ -254,10 +254,10 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                Section 11: Real-time Notification Demo
+                Direct Kitchen Notification
               </span>
               <h3 className="font-serif text-lg font-bold text-white">
-                WhatsApp Order Dispatch Preview
+                WhatsApp Order Dispatch Details
               </h3>
             </div>
           </div>
@@ -289,7 +289,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
         </div>
 
         <div className="p-3 rounded-xl bg-emerald-900/40 border border-emerald-800 text-[11px] text-emerald-300/90 leading-relaxed">
-          ℹ️ <strong>Developer Note for ZORA SHOP Owner:</strong> In production, this notification is triggered automatically to the shop owner & customer using the official <strong>WhatsApp Business Cloud API</strong> via webhooks immediately after checkout!
+          ℹ️ <strong>Boutique Kitchen Notification:</strong> Your order summary is formatted above for instant WhatsApp dispatch. You can tap the button to connect directly with the kitchen for instant dispatch confirmation.
         </div>
       </div>
 

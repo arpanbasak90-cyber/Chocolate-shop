@@ -337,7 +337,7 @@ export const DigitalMenuCard = () => {
 
             <div className="mt-3 text-center">
               <p className="text-xs text-stone-400">
-                All 9 chocolate varieties, per-piece prices, and 250g box prices have been incorporated into this prototype.
+                All 9 signature chocolate varieties, per-piece prices, and 250g box prices are available for instant ordering above.
               </p>
             </div>
           </div>

@@ -82,11 +82,11 @@ export const AdminDashboard = () => {
   const [whatsappOrderPreview, setWhatsappOrderPreview] = useState(null);
 
   // Stats from live backend
-  const totalOrders = adminStats?.totalOrders ?? (orders || []).length;
+  const totalOrders = Array.isArray(orders) ? orders.length : (adminStats?.totalOrders || 0);
   const pendingOrders = adminStats?.pendingOrders ?? 0;
   const completedOrders = adminStats?.deliveredOrders ?? 0;
   const totalRevenue = adminStats?.totalRevenue ?? 0;
-  const totalCustomers = adminStats?.totalCustomers ?? (adminCustomers || []).length;
+  const totalCustomers = Array.isArray(adminCustomers) ? adminCustomers.length : (adminStats?.totalCustomers || 0);
   const confirmedOrders = adminStats?.confirmedOrders ?? 0;
 
   // Filtered orders
@@ -375,6 +375,13 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#35180d]">
+                    {orders.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-stone-400">
+                          No customer orders recorded yet. Fresh live orders will appear here automatically.
+                        </td>
+                      </tr>
+                    )}
                     {orders.slice(0, 5).map((ord) => (
                       <tr key={ord.id} className="hover:bg-[#35180d]/60">
                         <td className="py-3 font-mono font-bold text-gold-300">
@@ -476,6 +483,15 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#35180d]">
+                  {filteredOrders.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-stone-400">
+                        <div className="text-3xl mb-2">📦</div>
+                        <p className="font-semibold text-white">No Orders Found</p>
+                        <p className="text-[11px] text-stone-500 mt-1">When customers place orders, they will appear here in real time.</p>
+                      </td>
+                    </tr>
+                  )}
                   {filteredOrders.map((ord) => (
                     <tr key={ord.id} className="hover:bg-[#35180d]/60">
                       <td className="py-3.5 align-top">
@@ -613,7 +629,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   <div className="text-3xl">👥</div>
                   <p className="font-semibold text-white">No Registered Customer Accounts Yet</p>
                   <p className="text-[11px] text-stone-500 max-w-sm mx-auto">
-                    When customers register via Email OTP and place chocolate orders, their verified profiles appear here.
+                    When customers sign in and place chocolate orders, their registered customer profiles will appear here in real time.
                   </p>
                 </div>
               ) : (

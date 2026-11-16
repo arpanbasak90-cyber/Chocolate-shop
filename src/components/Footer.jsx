@@ -72,7 +72,7 @@ export const Footer = ({ onReplaySplash }) => {
               <li>
                 <Link to="/admin" className="hover:text-gold-300 text-caramel-400 font-semibold flex items-center gap-1 transition">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  Admin Dashboard (Demo Login)
+                  Shopkeeper Owner Portal
                 </Link>
               </li>
               <li>
@@ -129,11 +129,8 @@ export const Footer = ({ onReplaySplash }) => {
         </div>
       </div>
 
-      {/* Demo Disclaimer & Copyright Bar */}
-      <div className="bg-chocolate-900/80 border-t border-chocolate-800 py-6 px-4 text-center text-xs text-stone-400 space-y-2">
-        <p className="max-w-2xl mx-auto text-[11px] text-caramel-300/80">
-          ⚠️ <strong>Interactive Prototype Note:</strong> This is a visual & functional demo prototype developed for <strong>ZORA SHOP</strong> to review the design, ordering flow, and admin panel before production deployment. No real payments or real SMS will be triggered.
-        </p>
+      {/* Copyright Bar */}
+      <div className="bg-chocolate-900/80 border-t border-chocolate-800 py-6 px-4 text-center text-xs text-stone-400">
         <p className="flex items-center justify-center gap-1 text-[11px]">
           © {new Date().getFullYear()} ZORA SHOP. Handcrafted with <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500 inline" /> for chocolate lovers everywhere.
         </p>
