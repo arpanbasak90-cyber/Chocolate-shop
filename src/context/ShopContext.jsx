@@ -47,6 +47,8 @@ export const ShopProvider = ({ children }) => {
   // Admin Data (populated when logged in as shopkeeper)
   const [adminOrders, setAdminOrders] = useState([]);
   const [adminCustomers, setAdminCustomers] = useState([]);
+  const [isAdminDataLoading, setIsAdminDataLoading] = useState(false);
+  const [adminDataError, setAdminDataError] = useState(null);
   const [adminStats, setAdminStats] = useState({
     totalCustomers: 0,
     totalOrders: 0,
@@ -129,8 +131,10 @@ export const ShopProvider = ({ children }) => {
     initSessions();
   }, [fetchProducts]);
 
-  // Fetch Admin Data when Shopkeeper logs in
-  const refreshAdminData = useCallback(async () => {
+  // Fetch Admin Data when Shopkeeper logs in with live auto-refresh
+  const refreshAdminData = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setIsAdminDataLoading(true);
+    setAdminDataError(null);
     try {
       const [statsRes, ordersRes, custsRes, settingsRes] = await Promise.allSettled([
         api.getAdminStats(),
@@ -139,20 +143,42 @@ export const ShopProvider = ({ children }) => {
         api.getStoreSettings()
       ]);
 
+      let hasError = false;
+      let errorMsg = '';
+
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
         setAdminStats(statsRes.value.stats);
+      } else if (statsRes.status === 'rejected') {
+        hasError = true;
+        errorMsg = statsRes.reason?.message || 'Failed to load statistics';
       }
+
       if (ordersRes.status === 'fulfilled' && ordersRes.value?.success) {
-        setAdminOrders(ordersRes.value.orders);
+        setAdminOrders(ordersRes.value.orders || []);
+      } else if (ordersRes.status === 'rejected') {
+        hasError = true;
+        errorMsg = ordersRes.reason?.message || 'Failed to load orders';
       }
+
       if (custsRes.status === 'fulfilled' && custsRes.value?.success) {
-        setAdminCustomers(custsRes.value.customers);
+        setAdminCustomers(custsRes.value.customers || []);
+      } else if (custsRes.status === 'rejected') {
+        hasError = true;
+        errorMsg = custsRes.reason?.message || 'Failed to load customers';
       }
+
       if (settingsRes.status === 'fulfilled' && settingsRes.value?.success && settingsRes.value.settings) {
         setShopSettings(settingsRes.value.settings);
       }
+
+      if (hasError && !silent) {
+        setAdminDataError(errorMsg);
+      }
     } catch (err) {
       console.error('Error refreshing admin data:', err);
+      if (!silent) setAdminDataError(err.message);
+    } finally {
+      if (!silent) setIsAdminDataLoading(false);
     }
   }, []);
 
@@ -171,10 +197,28 @@ export const ShopProvider = ({ children }) => {
     }
   }, [addToast]);
 
+  // Automatic Background Data Refresh when Owner is active
   useEffect(() => {
-    if (sessionRole === 'shopkeeper') {
-      refreshAdminData();
-    }
+    if (sessionRole !== 'shopkeeper') return;
+
+    // Initial load
+    refreshAdminData();
+
+    // 15-second background interval sync for new customer orders
+    const intervalId = setInterval(() => {
+      refreshAdminData({ silent: true });
+    }, 15000);
+
+    // Sync immediately when window/tab regains focus
+    const handleWindowFocus = () => {
+      refreshAdminData({ silent: true });
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
   }, [sessionRole, refreshAdminData]);
 
   // Fetch Customer Orders when Customer is active
@@ -513,6 +557,8 @@ export const ShopProvider = ({ children }) => {
         adminStats,
         adminOrders,
         adminCustomers,
+        isAdminDataLoading,
+        adminDataError,
         refreshAdminData,
         updateOrderStatus,
         addProduct,

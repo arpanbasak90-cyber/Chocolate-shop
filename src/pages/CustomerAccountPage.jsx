@@ -500,7 +500,7 @@ export const CustomerAccountPage = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-cream-200">
                         <div>
                           <span className="font-mono font-bold text-chocolate-950 text-sm">
-                            #{ord.id}
+                            {ord.orderNumber || `#${ord.id}`}
                           </span>
                           <span className="text-stone-400 text-xs ml-2">
                             • {new Date(ord.createdAt).toLocaleDateString()}

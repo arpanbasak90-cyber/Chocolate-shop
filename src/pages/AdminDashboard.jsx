@@ -37,6 +37,8 @@ export const AdminDashboard = () => {
     products,
     adminCustomers,
     adminStats,
+    isAdminDataLoading,
+    adminDataError,
     refreshAdminData,
     shopkeeperLogout,
     updateOrderStatus,
@@ -81,6 +83,15 @@ export const AdminDashboard = () => {
   // WhatsApp Preview Modal for any order
   const [whatsappOrderPreview, setWhatsappOrderPreview] = useState(null);
 
+  // Normalize order status across backend variants
+  const normalizeStatus = (status) => {
+    if (!status) return 'Order Placed';
+    if (status === 'Order Confirmed') return 'Confirmed';
+    if (status === 'Preparing Your Chocolates') return 'Preparing';
+    if (status === 'Rejected') return 'Cancelled';
+    return status;
+  };
+
   // Stats from live backend
   const totalOrders = Array.isArray(orders) ? orders.length : (adminStats?.totalOrders || 0);
   const pendingOrders = adminStats?.pendingOrders ?? 0;
@@ -89,13 +100,19 @@ export const AdminDashboard = () => {
   const totalCustomers = Array.isArray(adminCustomers) ? adminCustomers.length : (adminStats?.totalCustomers || 0);
   const confirmedOrders = adminStats?.confirmedOrders ?? 0;
 
-  // Filtered orders
+  // Filtered orders with search & status matching
   const filteredOrders = (orders || []).filter((o) => {
-    const matchesStatus = orderStatusFilter === 'All' || o.orderStatus === orderStatusFilter;
+    const rawStatus = o.orderStatus || '';
+    const normStatus = normalizeStatus(rawStatus);
+    const matchesStatus =
+      orderStatusFilter === 'All' ||
+      rawStatus === orderStatusFilter ||
+      normStatus === orderStatusFilter;
     const matchesSearch =
       (o.orderNumber || o.id || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
       (o.customer?.name || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
-      (o.customer?.phone || '').includes(orderSearch);
+      (o.customer?.phone || '').includes(orderSearch) ||
+      (o.customer?.email || '').toLowerCase().includes(orderSearch.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -150,7 +167,7 @@ export const AdminDashboard = () => {
       .join('\n');
 
     return `*🍫 ZORA SHOP - ORDER NOTIFICATION*
-*Order ID:* #${order.id}
+*Order Number:* ${order.orderNumber || `#${order.id}`}
 *Customer Name:* ${order.customer?.name || 'Customer'}
 *Phone Number:* ${order.customer?.phone || 'N/A'}
 *Delivery Address:* ${order.address?.house || ''}, ${order.address?.street || ''}, ${order.address?.city || ''} - ${order.address?.pincode || ''}
@@ -160,6 +177,7 @@ ${itemsText}
 
 *Subtotal:* ₹${order.subtotal}
 *Delivery Fee:* ₹${order.deliveryFee}
+*Discount:* ₹${order.discount || 0}
 *Total Amount:* ₹${order.grandTotal}
 *Payment Method:* ${order.paymentMethod} (${order.paymentStatus})
 *Current Status:* ${order.orderStatus}
@@ -231,11 +249,12 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
         <div className="pt-6 border-t border-[#421d10] space-y-3">
           <button
             onClick={refreshAdminData}
-            className="w-full py-2.5 px-3 rounded-xl bg-[#3c1b11] hover:bg-[#4a2114] text-gold-300 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+            disabled={isAdminDataLoading}
+            className="w-full py-2.5 px-3 rounded-xl bg-[#3c1b11] hover:bg-[#4a2114] text-gold-300 text-xs font-bold flex items-center justify-center gap-1.5 transition disabled:opacity-60"
             title="Refresh live orders, customer records, and revenue metrics"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh Store Data</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isAdminDataLoading ? 'animate-spin' : ''}`} />
+            <span>{isAdminDataLoading ? 'Refreshing...' : 'Refresh Store Data'}</span>
           </button>
 
           <button
@@ -252,6 +271,26 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
           MAIN CONTENT AREA
       ══════════════════════════════════════════════════════════════════════════ */}
       <main className="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto max-h-screen">
+
+        {/* Error Notification Banner */}
+        {adminDataError && (
+          <div className="mb-6 p-4 rounded-2xl bg-red-950/70 border border-red-800 text-red-200 flex items-center justify-between gap-3 animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+              <div>
+                <div className="font-bold text-xs">Production Database Warning</div>
+                <div className="text-[11px] text-red-300">{adminDataError}</div>
+              </div>
+            </div>
+            <button
+              onClick={refreshAdminData}
+              disabled={isAdminDataLoading}
+              className="px-3 py-1.5 rounded-xl bg-red-900 hover:bg-red-800 text-white text-xs font-bold shrink-0 transition"
+            >
+              {isAdminDataLoading ? 'Retrying...' : 'Retry'}
+            </button>
+          </div>
+        )}
 
         {/* TAB 1: DASHBOARD OVERVIEW */}
         {activeTab === 'dashboard' && (
@@ -384,14 +423,14 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                     {orders.slice(0, 5).map((ord) => (
                       <tr key={ord.id} className="hover:bg-[#35180d]/60">
                         <td className="py-3 font-mono font-bold text-gold-300">
-                          #{ord.id}
+                          {ord.orderNumber || `#${ord.id}`}
                         </td>
                         <td className="py-3">
                           <div className="font-bold text-white">{ord.customer?.name}</div>
-                          <div className="text-[11px] text-stone-400">{ord.customer?.phone}</div>
+                          <div className="text-[11px] text-stone-400">{ord.customer?.phone || ord.customer?.email}</div>
                         </td>
                         <td className="py-3 text-stone-300 max-w-xs truncate">
-                          {(ord.items || []).map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                          {(ord.items || []).map((i) => `${i.quantity}x ${i.name} (${i.packageName || 'Piece'})`).join(', ')}
                         </td>
                         <td className="py-3 font-bold text-white">
                           ₹{ord.grandTotal}
@@ -401,7 +440,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                         </td>
                         <td className="py-3">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#3c1b11] text-gold-300 border border-gold-500/30">
-                            {ord.orderStatus}
+                            {normalizeStatus(ord.orderStatus)}
                           </span>
                         </td>
                         <td className="py-3 text-right space-x-1">
@@ -452,7 +491,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
 
             {/* Status Filter Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-              {['All', 'Order Placed', 'Order Confirmed', 'Preparing Your Chocolates', 'Out for Delivery', 'Delivered', 'Rejected'].map((st) => (
+              {['All', 'Order Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'].map((st) => (
                 <button
                   key={st}
                   onClick={() => setOrderStatusFilter(st)}
@@ -471,11 +510,11 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-[#421d10] text-stone-400 uppercase tracking-wider text-[11px]">
-                    <th className="pb-3">Order ID & Date</th>
+                    <th className="pb-3">Order # & Date</th>
                     <th className="pb-3">Customer & Contact</th>
                     <th className="pb-3">Complete Delivery Address</th>
                     <th className="pb-3">Ordered Chocolates</th>
-                    <th className="pb-3">Payment</th>
+                    <th className="pb-3">Price & Payment</th>
                     <th className="pb-3">Update Order Status</th>
                     <th className="pb-3 text-right">Actions</th>
                   </tr>
@@ -494,31 +533,40 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                     <tr key={ord.id} className="hover:bg-[#35180d]/60">
                       <td className="py-3.5 align-top">
                         <div className="font-mono font-bold text-gold-300 text-sm">
-                          #{ord.id}
+                          {ord.orderNumber || `#${ord.id}`}
                         </div>
                         <div className="text-[10px] text-stone-400 mt-0.5">
                           {new Date(ord.createdAt).toLocaleDateString()}
                         </div>
+                        <div className="text-[10px] text-stone-500">
+                          {new Date(ord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </td>
 
                       <td className="py-3.5 align-top">
-                        <div className="font-bold text-white">{ord.customer?.name}</div>
+                        <div className="font-bold text-white">{ord.customer?.name || 'Customer'}</div>
                         <div className="text-stone-400 flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3 text-caramel-400" />
-                          <span>{ord.customer?.phone}</span>
+                          <span>{ord.customer?.phone || 'N/A'}</span>
                         </div>
-                        <div className="text-[10px] text-stone-500 truncate max-w-[140px]">
-                          {ord.customer?.email}
+                        <div className="text-[10px] text-stone-400 flex items-center gap-1 mt-0.5">
+                          <Mail className="w-3 h-3 text-stone-500" />
+                          <span className="truncate max-w-[140px]">{ord.customer?.email || 'N/A'}</span>
                         </div>
                       </td>
 
                       <td className="py-3.5 align-top max-w-xs">
                         <div className="text-stone-300 leading-snug">
-                          {ord.address?.house}, {ord.address?.street}
+                          {ord.address?.house ? `${ord.address.house}, ` : ''}{ord.address?.street || ''}
                         </div>
                         <div className="text-[11px] text-stone-400 mt-0.5">
-                          {ord.address?.city} - {ord.address?.pincode}
+                          {ord.address?.city || ''}{ord.address?.pincode ? ` - ${ord.address.pincode}` : ''}
                         </div>
+                        {ord.address?.instructions && (
+                          <div className="text-[10px] text-caramel-400/80 italic mt-0.5 truncate">
+                            Note: {ord.address.instructions}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 align-top">
@@ -527,6 +575,8 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                             <div key={idx} className="text-[11px] text-stone-300">
                               <strong>{it.quantity}x</strong> {it.name}{' '}
                               <span className="text-caramel-400">({it.packageName})</span>
+                              <span className="text-stone-400 ml-1">@ ₹{it.price || (it.total ? Math.round(it.total / it.quantity) : 0)}</span>
+                              <span className="text-gold-300 font-semibold ml-1">= ₹{it.total}</span>
                             </div>
                           ))}
                         </div>
@@ -539,20 +589,26 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                         <div className="text-[10px] text-stone-400 mt-0.5">
                           {ord.paymentMethod} • <span className="text-gold-300">{ord.paymentStatus}</span>
                         </div>
+                        {(ord.discount > 0 || ord.deliveryFee > 0) && (
+                          <div className="text-[10px] text-stone-500 mt-0.5">
+                            Sub: ₹{ord.subtotal} | Del: ₹{ord.deliveryFee}
+                            {ord.discount > 0 ? ` | Disc: -₹${ord.discount}` : ''}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 align-top">
                         <select
-                          value={ord.orderStatus}
+                          value={normalizeStatus(ord.orderStatus)}
                           onChange={(e) => updateOrderStatus(ord.id, e.target.value)}
                           className="text-xs font-semibold bg-[#1c0c07] border border-[#421d10] rounded-xl px-2.5 py-1.5 text-gold-300 focus:outline-none focus:border-caramel-500"
                         >
                           <option value="Order Placed">Order Placed</option>
-                          <option value="Order Confirmed">Order Confirmed</option>
-                          <option value="Preparing Your Chocolates">Preparing</option>
+                          <option value="Confirmed">Confirmed</option>
+                          <option value="Preparing">Preparing</option>
                           <option value="Out for Delivery">Out for Delivery</option>
                           <option value="Delivered">Delivered</option>
-                          <option value="Rejected">Rejected</option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
 
@@ -950,8 +1006,11 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                   Order Inspection
                 </span>
                 <h3 className="font-serif text-xl font-bold text-white">
-                  Order #{selectedOrder.id}
+                  Order {selectedOrder.orderNumber || `#${selectedOrder.id}`}
                 </h3>
+                <div className="text-[11px] text-stone-400 mt-0.5">
+                  Placed on {new Date(selectedOrder.createdAt).toLocaleString()}
+                </div>
               </div>
               <button
                 onClick={() => setSelectedOrder(null)}
@@ -964,17 +1023,17 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-[#1c0c07] space-y-1">
                 <h4 className="font-bold text-gold-300">Customer Details</h4>
-                <p><strong>Name:</strong> {selectedOrder.customer?.name}</p>
-                <p><strong>Phone:</strong> {selectedOrder.customer?.phone}</p>
-                <p><strong>Email:</strong> {selectedOrder.customer?.email}</p>
+                <p><strong>Name:</strong> {selectedOrder.customer?.name || 'Customer'}</p>
+                <p><strong>Phone:</strong> {selectedOrder.customer?.phone || 'N/A'}</p>
+                <p><strong>Email:</strong> {selectedOrder.customer?.email || 'N/A'}</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#1c0c07] space-y-1">
                 <h4 className="font-bold text-gold-300">Delivery Address</h4>
-                <p>{selectedOrder.address?.house}, {selectedOrder.address?.street}</p>
-                <p>{selectedOrder.address?.city} - {selectedOrder.address?.pincode}</p>
+                <p>{selectedOrder.address?.house ? `${selectedOrder.address.house}, ` : ''}{selectedOrder.address?.street || ''}</p>
+                <p>{selectedOrder.address?.city || ''}{selectedOrder.address?.pincode ? ` - ${selectedOrder.address.pincode}` : ''}</p>
                 {selectedOrder.address?.instructions && (
-                  <p className="text-[11px] text-stone-400 italic">"{selectedOrder.address.instructions}"</p>
+                  <p className="text-[11px] text-stone-400 italic">Note: "{selectedOrder.address.instructions}"</p>
                 )}
               </div>
             </div>
@@ -983,8 +1042,8 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               <h4 className="font-bold text-gold-300 uppercase mb-2">Chocolates in Basket</h4>
               <div className="space-y-1.5">
                 {(selectedOrder.items || []).map((it, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-[#1c0c07]">
-                    <div className="flex items-center gap-2">
+                  <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#1c0c07]">
+                    <div className="flex items-center gap-3">
                       <img
                         src={it.image || '/chocolate-placeholder.svg'}
                         alt={it.name}
@@ -992,41 +1051,85 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = '/chocolate-placeholder.svg';
                         }}
-                        className="w-8 h-8 rounded-lg object-cover"
+                        className="w-10 h-10 rounded-lg object-cover"
                       />
-                      <span>{it.quantity}x {it.name} ({it.packageName})</span>
+                      <div>
+                        <div className="font-bold text-white">
+                          {it.quantity}x {it.name} <span className="text-caramel-400">({it.packageName})</span>
+                        </div>
+                        <div className="text-[10px] text-stone-400">
+                          Unit price: ₹{it.price || (it.total ? Math.round(it.total / it.quantity) : 0)}
+                        </div>
+                      </div>
                     </div>
-                    <span className="font-bold text-white">₹{it.total}</span>
+                    <span className="font-bold text-gold-300 text-sm">₹{it.total}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-[#421d10]">
-              <div>
-                <span>Status: </span>
-                <strong className="text-gold-300">{selectedOrder.orderStatus}</strong>
+            {/* Price & Billing Breakdown */}
+            <div className="p-4 rounded-2xl bg-[#1c0c07] space-y-1.5">
+              <div className="flex justify-between text-stone-400">
+                <span>Subtotal</span>
+                <span>₹{selectedOrder.subtotal}</span>
               </div>
-              <div className="text-right">
-                <span className="text-stone-400">Total: </span>
-                <span className="font-serif text-lg font-bold text-caramel-300">₹{selectedOrder.grandTotal}</span>
+              <div className="flex justify-between text-stone-400">
+                <span>Delivery Charge</span>
+                <span>₹{selectedOrder.deliveryFee}</span>
+              </div>
+              {selectedOrder.discount > 0 && (
+                <div className="flex justify-between text-emerald-400">
+                  <span>Discount</span>
+                  <span>-₹{selectedOrder.discount}</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-2 border-t border-[#35180d] font-bold text-sm">
+                <span className="text-white">Grand Total</span>
+                <span className="text-caramel-300 font-serif text-base">₹{selectedOrder.grandTotal}</span>
+              </div>
+              <div className="text-[11px] text-stone-400 pt-1">
+                <strong>Payment:</strong> {selectedOrder.paymentMethod} • <span className="text-gold-300">{selectedOrder.paymentStatus}</span>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => openWhatsAppDispatcher(selectedOrder)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Open in WhatsApp</span>
-              </button>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 rounded-xl bg-[#3c1b11] text-stone-300 font-bold"
-              >
-                Close
-              </button>
+            {/* Status Changer & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#421d10]">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-stone-300">Status:</span>
+                <select
+                  value={normalizeStatus(selectedOrder.orderStatus)}
+                  onChange={async (e) => {
+                    const newSt = e.target.value;
+                    await updateOrderStatus(selectedOrder.id, newSt);
+                    setSelectedOrder((prev) => prev ? { ...prev, orderStatus: newSt } : null);
+                  }}
+                  className="text-xs font-semibold bg-[#1c0c07] border border-[#421d10] rounded-xl px-3 py-1.5 text-gold-300 focus:outline-none focus:border-caramel-500"
+                >
+                  <option value="Order Placed">Order Placed</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Preparing">Preparing</option>
+                  <option value="Out for Delivery">Out for Delivery</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => openWhatsAppDispatcher(selectedOrder)}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="px-4 py-2 rounded-xl bg-[#3c1b11] text-stone-300 font-bold hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

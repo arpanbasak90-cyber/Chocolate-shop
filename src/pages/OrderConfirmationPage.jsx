@@ -58,10 +58,10 @@ export const OrderConfirmationPage = () => {
     .join('\n');
 
   const formattedWhatsAppText = `*🍫 NEW ORDER - ZORA SHOP*
-*Order ID:* #${currentOrder.id}
-*Customer:* ${currentOrder.customer.name}
-*Phone:* ${currentOrder.customer.phone}
-*Address:* ${currentOrder.address.house}, ${currentOrder.address.street}, ${currentOrder.address.city} - ${currentOrder.address.pincode}
+*Order Number:* ${currentOrder.orderNumber || `#${currentOrder.id}`}
+*Customer:* ${currentOrder.customer?.name || 'Customer'}
+*Phone:* ${currentOrder.customer?.phone || 'N/A'}
+*Address:* ${currentOrder.address?.house ? `${currentOrder.address.house}, ` : ''}${currentOrder.address?.street || ''}, ${currentOrder.address?.city || ''} - ${currentOrder.address?.pincode || ''}
 
 *Chocolates Ordered:*
 ${itemsText}
@@ -115,7 +115,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
         <div className="mt-6 inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-chocolate-900/90 border border-gold-400/40">
           <span className="text-xs text-stone-400">Order Reference:</span>
           <span className="font-mono text-lg sm:text-xl font-bold text-gold-300 tracking-wider">
-            #{currentOrder.id}
+            {currentOrder.orderNumber || `#${currentOrder.id}`}
           </span>
         </div>
 

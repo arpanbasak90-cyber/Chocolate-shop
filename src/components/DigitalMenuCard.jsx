@@ -17,7 +17,7 @@ import {
 
 export const DigitalMenuCard = () => {
   const { products, addToCart, addToast } = useShop();
-  const [favoriteIds, setFavoriteIds] = useState(['prod-almond', 'prod-rasmalai']);
+  const [favoriteIds, setFavoriteIds] = useState(['2', '5']);
   const [showOriginalPoster, setShowOriginalPoster] = useState(false);
 
   const toggleFavorite = (id, name) => {

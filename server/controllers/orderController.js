@@ -1,11 +1,11 @@
-import { db } from '../services/database.js';
+import { db, mapOrderStatus } from '../services/database.js';
 import { calculateVerifiedCart } from './cartController.js';
 import { generateWhatsAppOrderUrl } from '../services/whatsappService.js';
 import razorpayInstance from '../config/razorpay.js';
 import { config } from '../config/env.js';
 
 /**
- * 1. Checkout & Create Order (Server-Side Recalculated)
+ * 1. Checkout & Create Order (Server-Side Recalculated & Database Committed)
  */
 export async function createCheckoutOrder(req, res) {
   try {
@@ -30,10 +30,27 @@ export async function createCheckoutOrder(req, res) {
     // Strictly recalculate totals from database products
     const verified = await calculateVerifiedCart(items, promoCode);
 
+    // Prevent accidental duplicate submissions within 30 seconds
+    const duplicate = await db.findRecentDuplicateOrder({
+      customerId: customer.id,
+      grandTotal: verified.grandTotal,
+      withinSeconds: 30
+    });
+    if (duplicate) {
+      console.log(`⚠️ Prevented duplicate order submission for customer ${customer.email} (Order: ${duplicate.orderNumber})`);
+      return res.status(200).json({
+        success: true,
+        message: 'Order already received and queued for small-batch preparation.',
+        order: duplicate,
+        whatsappUrl: generateWhatsAppOrderUrl(duplicate),
+        isDuplicate: true
+      });
+    }
+
     // Initial payment status
     const initialPaymentStatus = chosenMethod === 'COD' ? 'Pending (Cash on Delivery)' : 'Pending Online Payment';
 
-    // Save order in database
+    // Save order in persistent database
     const order = await db.createOrder({
       customerId: customer.id,
       customer: {
@@ -147,24 +164,25 @@ export async function adminUpdateOrderStatus(req, res) {
     const { orderId } = req.params;
     const { status, notes } = req.body;
 
+    const mappedStatus = mapOrderStatus(status);
     const validStatuses = ['Order Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
-    if (!validStatuses.includes(status)) {
+    if (!validStatuses.includes(mappedStatus)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid order status. Allowed: ${validStatuses.join(', ')}`
+        message: `Invalid order status "${status}". Allowed: ${validStatuses.join(', ')}`
       });
     }
 
-    const updated = await db.updateOrderStatus(orderId, status, notes, 'OWNER');
+    const updated = await db.updateOrderStatus(orderId, mappedStatus, notes, 'OWNER');
     if (!updated) {
-      return res.status(404).json({ success: false, message: 'Order not found.' });
+      return res.status(404).json({ success: false, message: 'Order not found in database.' });
     }
 
-    console.log(`🚚 Order status updated: ${updated.orderNumber} -> ${status}`);
-    return res.status(200).json({ success: true, message: `Order status updated to "${status}".`, order: updated });
+    console.log(`🚚 Order status updated: ${updated.orderNumber || updated.id} -> ${mappedStatus}`);
+    return res.status(200).json({ success: true, message: `Order status updated to "${mappedStatus}".`, order: updated });
   } catch (error) {
     console.error('Error in adminUpdateOrderStatus:', error);
-    return res.status(500).json({ success: false, message: 'Failed to update order status.' });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to update order status.' });
   }
 }
 

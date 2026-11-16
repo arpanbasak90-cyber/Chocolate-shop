@@ -20,6 +20,7 @@ export const config = {
   adminSetupSecret: process.env.ADMIN_SETUP_SECRET || 'zora_owner_master_setup_secret_2026',
 
   databaseUrl: process.env.DATABASE_URL,
+  directUrl: process.env.DIRECT_URL,
 
   smtp: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',

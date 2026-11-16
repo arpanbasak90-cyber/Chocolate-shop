@@ -75,14 +75,41 @@ if (config.nodeEnv === 'development') {
 }
 
 // Health check endpoints (both /api/health and /health)
-const handleHealth = (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    shop: config.shop.name,
-    environment: config.nodeEnv,
-    databaseEngine: db.isPostgresReady() ? 'PostgreSQL (Prisma)' : 'Local Persistent Storage',
-    timestamp: new Date().toISOString()
-  });
+const handleHealth = async (req, res) => {
+  try {
+    const health = await db.checkHealth();
+    if (!health.connected) {
+      return res.status(503).json({
+        status: 'unhealthy',
+        databaseEngine: health.engine,
+        connected: false,
+        shop: config.shop.name,
+        environment: config.nodeEnv,
+        error: health.error || 'Failed to establish persistent PostgreSQL database connection.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.status(200).json({
+      status: 'healthy',
+      databaseEngine: health.engine, // "PostgreSQL" ONLY upon successful query
+      connected: true,
+      shop: config.shop.name,
+      environment: config.nodeEnv,
+      latencyMs: health.latencyMs,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      databaseEngine: 'Disconnected',
+      connected: false,
+      shop: config.shop.name,
+      environment: config.nodeEnv,
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 };
 app.get('/api/health', handleHealth);
 app.get('/health', handleHealth);

@@ -97,7 +97,7 @@ export const Footer = ({ onReplaySplash }) => {
               <li className="hover:text-cream-100 transition">👑 Royal Indian Fusion (Rasmalai & Gulkand)</li>
               <li className="hover:text-cream-100 transition">🍫 Classic Dark & Milk Silks</li>
               <li className="hover:text-cream-100 transition">🍪 Crunchy Oreo & Fruity Gems</li>
-              <li className="hover:text-cream-100 transition">🎁 Custom Gift Hampers & Wedding Tins</li>
+              <li className="hover:text-cream-100 transition">🍬 Fruity & Jellies (Tutti Frutti & Jelly Cubes)</li>
             </ul>
           </div>
 

@@ -5,36 +5,106 @@ import { INITIAL_PRODUCTS, CATEGORIES } from '../../src/data/products.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
 const DATA_DIR = isServerless ? '/tmp/zora-data' : path.join(__dirname, '../data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SOURCE_DB_FILE = path.join(__dirname, '../data/db.json');
 
-// Optional dynamic Prisma client
-let prisma = null;
+// Global Prisma Singleton pattern (critical for serverless / lambda environments to prevent connection exhaustion)
+let globalPrisma = null;
 let isPrismaConnected = false;
+let prismaConnectingPromise = null;
 
-// Attempt PostgreSQL connection via Prisma ONLY if a valid PostgreSQL DATABASE_URL is provided
-async function testPrismaConnection() {
-  if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('postgres')) {
-    isPrismaConnected = false;
-    return;
-  }
-  try {
-    const { PrismaClient } = await import('@prisma/client');
-    prisma = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
-    });
-    await prisma.$connect();
-    isPrismaConnected = true;
-    console.log('✅ Connected to PostgreSQL Database via Prisma.');
-  } catch (err) {
-    isPrismaConnected = false;
-    console.warn('ℹ️ PostgreSQL not reachable. Running with persistent database engine.');
-  }
+// Legacy ID mapping to guarantee smooth backward compatibility with existing carts
+const LEGACY_ID_MAP = {
+  'prod-plain': '1',
+  'prod-almond': '2',
+  'prod-dryfruit': '3',
+  'prod-oreo': '4',
+  'prod-rasmalai': '5',
+  'prod-tuttifrutti': '6',
+  'prod-jelly': '7',
+  'prod-walnut': '8',
+  'prod-gulkand': '9'
+};
+
+/**
+ * Standardize order status strings across frontend and backend
+ */
+export function mapOrderStatus(status) {
+  if (!status) return 'Order Placed';
+  const clean = status.trim().toLowerCase();
+  if (clean === 'order placed') return 'Order Placed';
+  if (clean === 'confirmed' || clean === 'order confirmed') return 'Confirmed';
+  if (clean === 'preparing' || clean === 'preparing your chocolates') return 'Preparing';
+  if (clean === 'out for delivery') return 'Out for Delivery';
+  if (clean === 'delivered') return 'Delivered';
+  if (clean === 'cancelled' || clean === 'rejected') return 'Cancelled';
+  return status;
 }
-testPrismaConnection().catch(() => {});
 
+/**
+ * Robust Prisma connection manager with health verification
+ */
+async function getPrismaClient() {
+  if (globalPrisma && isPrismaConnected) {
+    return globalPrisma;
+  }
+
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl || !dbUrl.startsWith('postgres')) {
+    if (isProduction) {
+      throw new Error(
+        'CRITICAL PRODUCTION ERROR: PostgreSQL DATABASE_URL is not configured in production environment. Persistent database is mandatory.'
+      );
+    }
+    return null;
+  }
+
+  if (prismaConnectingPromise) {
+    return await prismaConnectingPromise;
+  }
+
+  prismaConnectingPromise = (async () => {
+    try {
+      const { PrismaClient } = await import('@prisma/client');
+      if (!globalPrisma) {
+        globalPrisma = new PrismaClient({
+          datasources: {
+            db: { url: dbUrl }
+          },
+          log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
+        });
+      }
+      await globalPrisma.$connect();
+      // Verify connectivity with a quick query
+      await globalPrisma.$queryRaw`SELECT 1`;
+      isPrismaConnected = true;
+      console.log('✅ PostgreSQL Database connected successfully via Prisma.');
+      return globalPrisma;
+    } catch (err) {
+      isPrismaConnected = false;
+      console.error('❌ PostgreSQL Database connection failed:', err.message);
+      if (isProduction) {
+        throw new Error(`Production PostgreSQL connection error: ${err.message}. Persistent storage unavailable.`);
+      }
+      return null;
+    } finally {
+      prismaConnectingPromise = null;
+    }
+  })();
+
+  return await prismaConnectingPromise;
+}
+
+// Initial connection attempt on boot
+getPrismaClient().catch(() => {});
+
+// ============================================================================
+// LOCAL DEVELOPMENT FALLBACK DATABASE (DEV-ONLY)
+// ============================================================================
 function getInitialData() {
   return {
     customers: [],
@@ -70,7 +140,7 @@ function getInitialData() {
       shopName: 'ZORA SHOP',
       tagline: 'Sweetness in Every Bite!',
       whatsappNumber: '+91 6289760577',
-      contactEmail: 'zorashop.homemade@gmail.com',
+      contactEmail: 'abhijitsaha23485@gmail.com',
       shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
       deliveryFeeThreshold: 500,
       standardDeliveryFee: 40,
@@ -81,19 +151,16 @@ function getInitialData() {
   };
 }
 
-// Local fallback DB initialization
 function initLocalDb() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-
     if (!fs.existsSync(DB_FILE)) {
       if (isServerless && fs.existsSync(SOURCE_DB_FILE)) {
         fs.copyFileSync(SOURCE_DB_FILE, DB_FILE);
         return;
       }
-
       const initialData = getInitialData();
       fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf8');
     }
@@ -168,45 +235,89 @@ function writeLocalDb(data) {
 }
 
 // ============================================================================
-// UNIFIED DATABASE SERVICE (Dual Engine: PostgreSQL / Local Persistent Fallback)
+// UNIFIED DATABASE SERVICE
 // ============================================================================
 export const db = {
   get prisma() {
-    return prisma;
+    return globalPrisma;
   },
   isPostgresReady: () => isPrismaConnected,
 
-  // 1. PRODUCTS
-  async getProducts({ category, search, sortBy }) {
-    if (isPrismaConnected) {
-      try {
-        const where = {};
-        if (category && category !== 'All Chocolates') {
-          where.category = { name: category };
-        }
-        if (search) {
-          where.OR = [
-            { name: { contains: search, mode: 'insensitive' } },
-            { shortDescription: { contains: search, mode: 'insensitive' } }
-          ];
-        }
-        let orderBy = { createdAt: 'desc' };
-        if (sortBy === 'price-low') orderBy = { piecePrice: 'asc' };
-        if (sortBy === 'price-high') orderBy = { piecePrice: 'desc' };
-        if (sortBy === 'rating') orderBy = { rating: 'desc' };
-
-        return await prisma.product.findMany({
-          where,
-          orderBy,
-          include: { category: true }
-        });
-      } catch (e) {
-        console.warn('Prisma getProducts fallback to local store:', e.message);
+  /**
+   * Complete database health inspection
+   * Reports engine: 'PostgreSQL' ONLY when the real PostgreSQL query succeeds
+   */
+  async checkHealth() {
+    try {
+      const client = await getPrismaClient();
+      if (client) {
+        const start = Date.now();
+        await client.$queryRaw`SELECT 1`;
+        const latencyMs = Date.now() - start;
+        return {
+          connected: true,
+          engine: 'PostgreSQL',
+          latencyMs,
+          isProduction
+        };
       }
+    } catch (err) {
+      return {
+        connected: false,
+        engine: 'Disconnected',
+        error: err.message,
+        isProduction
+      };
+    }
+
+    if (isProduction) {
+      return {
+        connected: false,
+        engine: 'Disconnected',
+        error: 'DATABASE_URL is not set or PostgreSQL is unreachable.',
+        isProduction: true
+      };
+    }
+
+    return {
+      connected: false,
+      engine: 'Disconnected',
+      error: 'PostgreSQL database connection is not active.',
+      isProduction: false
+    };
+  },
+
+  // ==========================================================================
+  // 1. PRODUCTS
+  // ==========================================================================
+  async getProducts({ category, search, sortBy } = {}) {
+    const client = await getPrismaClient();
+    if (client) {
+      const where = { isAvailable: true };
+      if (category && category !== 'All Chocolates') {
+        where.category = { name: category };
+      }
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { shortDescription: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+      let orderBy = { createdAt: 'desc' };
+      if (sortBy === 'price-low') orderBy = { piecePrice: 'asc' };
+      if (sortBy === 'price-high') orderBy = { piecePrice: 'desc' };
+      if (sortBy === 'rating') orderBy = { rating: 'desc' };
+
+      const products = await client.product.findMany({
+        where,
+        orderBy,
+        include: { category: true }
+      });
+      return products;
     }
 
     const local = readLocalDb();
-    let prods = [...(local.products || [])];
+    let prods = [...(local.products || [])].filter(p => p.isAvailable !== false);
 
     if (category && category !== 'All Chocolates') {
       prods = prods.filter(p => p.category === category || p.category?.name === category);
@@ -226,21 +337,33 @@ export const db = {
   },
 
   async getProductByIdOrSlug(idOrSlug) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.product.findFirst({
-          where: {
-            OR: [{ id: idOrSlug }, { slug: idOrSlug }]
-          },
-          include: { category: true }
-        });
-      } catch (e) {
-        console.warn('Prisma getProductByIdOrSlug fallback:', e.message);
-      }
+    if (!idOrSlug) return null;
+    const cleanId = String(idOrSlug).trim();
+    const mappedId = Object.prototype.hasOwnProperty.call(LEGACY_ID_MAP, cleanId) ? LEGACY_ID_MAP[cleanId] : cleanId;
+
+    const client = await getPrismaClient();
+    if (client) {
+      const prod = await client.product.findFirst({
+        where: {
+          OR: [
+            { id: cleanId },
+            { id: mappedId },
+            { slug: cleanId },
+            { slug: mappedId }
+          ]
+        },
+        include: { category: true }
+      });
+      if (prod) return prod;
     }
 
     const local = readLocalDb();
-    return (local.products || []).find(p => p.id === idOrSlug || p.slug === idOrSlug) || null;
+    return (local.products || []).find(p =>
+      p.id === cleanId ||
+      p.id === mappedId ||
+      p.slug === cleanId ||
+      p.slug === mappedId
+    ) || null;
   },
 
   async createProduct(data) {
@@ -269,12 +392,13 @@ export const db = {
       prepTime: data.prepTime || 'Freshly Prepared'
     };
 
-    if (isPrismaConnected) {
-      try {
-        return await prisma.product.create({ data: newProduct });
-      } catch (e) {
-        console.warn('Prisma createProduct fallback:', e.message);
-      }
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.product.create({ data: newProduct });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot create product in production. Persistent PostgreSQL required.');
     }
 
     const local = readLocalDb();
@@ -284,15 +408,16 @@ export const db = {
   },
 
   async updateProduct(id, data) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.product.update({
-          where: { id },
-          data
-        });
-      } catch (e) {
-        console.warn('Prisma updateProduct fallback:', e.message);
-      }
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.product.update({
+        where: { id },
+        data
+      });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot update product in production. Persistent PostgreSQL required.');
     }
 
     const local = readLocalDb();
@@ -308,12 +433,13 @@ export const db = {
   },
 
   async deleteProduct(id) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.product.delete({ where: { id } });
-      } catch (e) {
-        console.warn('Prisma deleteProduct fallback:', e.message);
-      }
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.product.delete({ where: { id } });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot delete product in production. Persistent PostgreSQL required.');
     }
 
     const local = readLocalDb();
@@ -322,33 +448,33 @@ export const db = {
     return true;
   },
 
+  // ==========================================================================
   // 2. CUSTOMERS
+  // ==========================================================================
   async findCustomerByEmail(email) {
     if (!email) return null;
     const cleanEmail = email.trim().toLowerCase();
-    if (isPrismaConnected) {
-      try {
-        return await prisma.customer.findUnique({
-          where: { email: cleanEmail },
-          include: { addresses: true, orders: true }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.customer.findUnique({
+        where: { email: cleanEmail },
+        include: { addresses: true, orders: true }
+      });
     }
 
     const local = readLocalDb();
-    return (local.customers || []).find(c => c.email.toLowerCase() === cleanEmail) || null;
+    return (local.customers || []).find(c => (c.email || '').toLowerCase() === cleanEmail) || null;
   },
 
   async findCustomerByPhone(phone) {
     if (!phone) return null;
     const cleanPhone = phone.trim();
-    if (isPrismaConnected) {
-      try {
-        return await prisma.customer.findUnique({
-          where: { phone: cleanPhone },
-          include: { addresses: true, orders: true }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.customer.findUnique({
+        where: { phone: cleanPhone },
+        include: { addresses: true, orders: true }
+      });
     }
 
     const local = readLocalDb();
@@ -356,13 +482,13 @@ export const db = {
   },
 
   async findCustomerById(id) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.customer.findUnique({
-          where: { id },
-          include: { addresses: true, orders: true }
-        });
-      } catch (e) {}
+    if (!id) return null;
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.customer.findUnique({
+        where: { id },
+        include: { addresses: true, orders: true }
+      });
     }
 
     const local = readLocalDb();
@@ -372,35 +498,50 @@ export const db = {
   async createOrUpdateCustomer({ name, email, phone }) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
+    const cleanName = name.trim();
 
-    if (isPrismaConnected) {
-      try {
-        return await prisma.customer.upsert({
-          where: { email: cleanEmail },
-          update: {
-            name,
-            phone: cleanPhone,
-            isEmailVerified: true,
-            isPhoneVerified: true
-          },
-          create: {
-            name,
+    const client = await getPrismaClient();
+    if (client) {
+      // Find existing by email or phone to prevent unique constraint crashes
+      const existing = await client.customer.findFirst({
+        where: {
+          OR: [{ email: cleanEmail }, { phone: cleanPhone }]
+        }
+      });
+
+      if (existing) {
+        return await client.customer.update({
+          where: { id: existing.id },
+          data: {
+            name: cleanName,
             email: cleanEmail,
             phone: cleanPhone,
             isEmailVerified: true,
             isPhoneVerified: true
           }
         });
-      } catch (e) {
-        console.warn('Prisma createOrUpdateCustomer fallback:', e.message);
       }
+
+      return await client.customer.create({
+        data: {
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          isEmailVerified: true,
+          isPhoneVerified: true
+        }
+      });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot register customer. Production PostgreSQL database is unavailable.');
     }
 
     const local = readLocalDb();
-    let cust = (local.customers || []).find(c => c.email.toLowerCase() === cleanEmail || c.phone === cleanPhone);
+    let cust = (local.customers || []).find(c => (c.email || '').toLowerCase() === cleanEmail || c.phone === cleanPhone);
 
     if (cust) {
-      cust.name = name;
+      cust.name = cleanName;
       cust.email = cleanEmail;
       cust.phone = cleanPhone;
       cust.isEmailVerified = true;
@@ -409,7 +550,7 @@ export const db = {
     } else {
       cust = {
         id: `cust-${Date.now()}`,
-        name,
+        name: cleanName,
         email: cleanEmail,
         phone: cleanPhone,
         isEmailVerified: true,
@@ -426,13 +567,36 @@ export const db = {
   },
 
   async getAllCustomers() {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.customer.findMany({
-          include: { orders: true, addresses: true },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      const customers = await client.customer.findMany({
+        include: {
+          orders: {
+            include: { items: true, address: true },
+            orderBy: { createdAt: 'desc' }
+          },
+          addresses: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return customers.map(c => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        isEmailVerified: c.isEmailVerified,
+        isPhoneVerified: c.isPhoneVerified,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        ordersCount: (c.orders || []).length,
+        orders: c.orders || [],
+        addresses: c.addresses || []
+      }));
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot retrieve customer records. Production PostgreSQL database is unavailable.');
     }
 
     const local = readLocalDb();
@@ -446,20 +610,22 @@ export const db = {
     });
   },
 
-  // 3. ADMIN USER
+  // ==========================================================================
+  // 3. ADMIN USER (STORE OWNER)
+  // ==========================================================================
   async findAdminByEmail(email) {
     if (!email) return null;
     const cleanEmail = email.trim().toLowerCase();
-    if (isPrismaConnected) {
-      try {
-        return await prisma.adminUser.findUnique({
-          where: { email: cleanEmail }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      const admin = await client.adminUser.findUnique({
+        where: { email: cleanEmail }
+      });
+      if (admin) return admin;
     }
 
     const local = readLocalDb();
-    const admin = (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail && a.email.toLowerCase() !== 'arpanbasak90@gmail.com') || null;
+    const admin = (local.adminUsers || []).find(a => (a.email || '').toLowerCase() === cleanEmail && (a.email || '').toLowerCase() !== 'arpanbasak90@gmail.com') || null;
     if (admin && admin.isActive === undefined) {
       admin.isActive = true;
     }
@@ -470,23 +636,27 @@ export const db = {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
 
-    if (isPrismaConnected) {
-      try {
-        return await prisma.adminUser.upsert({
-          where: { email: cleanEmail },
-          update: { name, phone: cleanPhone, role, passwordHash },
-          create: { name, email: cleanEmail, phone: cleanPhone, role, passwordHash }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.adminUser.upsert({
+        where: { email: cleanEmail },
+        update: { name, phone: cleanPhone, role, passwordHash, isActive: true },
+        create: { name, email: cleanEmail, phone: cleanPhone, role, passwordHash, isActive: true }
+      });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot create owner account. Production PostgreSQL database is unavailable.');
     }
 
     const local = readLocalDb();
-    let admin = (local.adminUsers || []).find(a => a.email.toLowerCase() === cleanEmail);
+    let admin = (local.adminUsers || []).find(a => (a.email || '').toLowerCase() === cleanEmail);
     if (admin) {
       admin.name = name;
       admin.phone = cleanPhone;
       admin.role = role;
       admin.passwordHash = passwordHash;
+      admin.isActive = true;
       admin.updatedAt = new Date().toISOString();
     } else {
       admin = {
@@ -506,21 +676,22 @@ export const db = {
     return admin;
   },
 
+  // ==========================================================================
   // 4. VERIFICATION OTP RECORDS
+  // ==========================================================================
   async saveOtp({ identifier, channel, type, otpHash, expiresAt }) {
     const cleanId = identifier.trim().toLowerCase();
-    if (isPrismaConnected) {
-      try {
-        return await prisma.verificationOtp.create({
-          data: {
-            identifier: cleanId,
-            channel,
-            type,
-            otpHash,
-            expiresAt
-          }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.verificationOtp.create({
+        data: {
+          identifier: cleanId,
+          channel,
+          type,
+          otpHash,
+          expiresAt
+        }
+      });
     }
 
     const local = readLocalDb();
@@ -542,18 +713,17 @@ export const db = {
 
   async getLatestOtp({ identifier, channel, type }) {
     const cleanId = identifier.trim().toLowerCase();
-    if (isPrismaConnected) {
-      try {
-        return await prisma.verificationOtp.findFirst({
-          where: {
-            identifier: cleanId,
-            channel,
-            type,
-            isVerified: false
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.verificationOtp.findFirst({
+        where: {
+          identifier: cleanId,
+          channel,
+          type,
+          isVerified: false
+        },
+        orderBy: { createdAt: 'desc' }
+      });
     }
 
     const local = readLocalDb();
@@ -564,13 +734,12 @@ export const db = {
   },
 
   async incrementOtpAttempts(id) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.verificationOtp.update({
-          where: { id },
-          data: { attempts: { increment: 1 } }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.verificationOtp.update({
+        where: { id },
+        data: { attempts: { increment: 1 } }
+      });
     }
 
     const local = readLocalDb();
@@ -582,13 +751,12 @@ export const db = {
   },
 
   async markOtpVerified(id) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.verificationOtp.update({
-          where: { id },
-          data: { isVerified: true }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.verificationOtp.update({
+        where: { id },
+        data: { isVerified: true }
+      });
     }
 
     const local = readLocalDb();
@@ -599,30 +767,213 @@ export const db = {
     }
   },
 
-  // 5. ORDERS
+  // ==========================================================================
+  // 5. ORDERS & CHECKOUT PERSISTENCE
+  // ==========================================================================
+  async findRecentDuplicateOrder({ customerId, grandTotal, withinSeconds = 30 }) {
+    const thresholdTime = new Date(Date.now() - withinSeconds * 1000);
+    const client = await getPrismaClient();
+
+    if (client) {
+      return await client.order.findFirst({
+        where: {
+          customerId,
+          grandTotal,
+          createdAt: { gte: thresholdTime }
+        },
+        include: { items: true, customer: true, address: true, statusHistory: true }
+      });
+    }
+
+    const local = readLocalDb();
+    return (local.orders || []).find(o =>
+      o.customerId === customerId &&
+      Math.abs(o.grandTotal - grandTotal) < 0.01 &&
+      new Date(o.createdAt) >= thresholdTime
+    ) || null;
+  },
+
   async createOrder({ customerId, customer, address, items, subtotal, deliveryFee, discount, grandTotal, paymentMethod, paymentStatus = 'PENDING', notes }) {
     const orderNumber = `ZORA-${Math.floor(100000 + Math.random() * 900000)}`;
+    const cleanEmail = customer.email.trim().toLowerCase();
+    const cleanPhone = customer.phone.trim();
+
+    const client = await getPrismaClient();
+
+    if (client) {
+      // 1. Ensure Customer exists in PostgreSQL
+      let dbCustomer = await client.customer.findFirst({
+        where: {
+          OR: [{ id: customerId }, { email: cleanEmail }, { phone: cleanPhone }]
+        }
+      });
+
+      if (!dbCustomer) {
+        dbCustomer = await client.customer.create({
+          data: {
+            name: customer.name.trim(),
+            email: cleanEmail,
+            phone: cleanPhone,
+            isEmailVerified: true,
+            isPhoneVerified: true
+          }
+        });
+      } else if (dbCustomer.name !== customer.name.trim()) {
+        dbCustomer = await client.customer.update({
+          where: { id: dbCustomer.id },
+          data: { name: customer.name.trim() }
+        });
+      }
+
+      // 2. Persist Delivery Address in PostgreSQL linked to Customer
+      const dbAddress = await client.address.create({
+        data: {
+          customerId: dbCustomer.id,
+          house: address.house.trim(),
+          street: address.street.trim(),
+          landmark: (address.landmark || '').trim() || null,
+          city: address.city.trim(),
+          state: address.state.trim(),
+          pincode: address.pincode.trim(),
+          instructions: (address.instructions || '').trim() || null
+        }
+      });
+
+      // 3. Resolve Product foreign keys safely to avoid constraint failure
+      const orderItemsData = [];
+      for (const it of items) {
+        let validProductId = null;
+        const targetId = it.productId || it.id;
+        if (targetId) {
+          const prodRecord = await this.getProductByIdOrSlug(targetId).catch(() => null);
+          if (prodRecord) validProductId = prodRecord.id;
+        }
+
+        orderItemsData.push({
+          productId: validProductId,
+          name: it.name,
+          packageType: it.packageType,
+          packageName: it.packageName,
+          price: Number(it.price),
+          quantity: Number(it.quantity),
+          total: Number(it.total),
+          image: it.image || null
+        });
+      }
+
+      // 4. Create complete relational Order in PostgreSQL
+      const created = await client.order.create({
+        data: {
+          orderNumber,
+          customerId: dbCustomer.id,
+          addressId: dbAddress.id,
+          subtotal: Number(subtotal),
+          deliveryFee: Number(deliveryFee),
+          discount: Number(discount),
+          grandTotal: Number(grandTotal),
+          paymentMethod,
+          paymentStatus,
+          orderStatus: 'Order Placed',
+          notes: notes || null,
+          items: {
+            create: orderItemsData
+          },
+          statusHistory: {
+            create: {
+              status: 'Order Placed',
+              notes: 'Order confirmed and placed by customer',
+              changedBy: 'CUSTOMER'
+            }
+          }
+        },
+        include: {
+          items: true,
+          customer: true,
+          address: true,
+          statusHistory: { orderBy: { createdAt: 'asc' } },
+          payments: true
+        }
+      });
+
+      console.log(`✅ Order committed to PostgreSQL: ${created.orderNumber} (ID: ${created.id})`);
+      return created;
+    }
+
+    // In production, NEVER pretend order succeeded if persistent database is down!
+    if (isProduction) {
+      throw new Error(
+        'CRITICAL DATABASE ERROR: Order cannot be placed. Persistent PostgreSQL storage is not connected in production.'
+      );
+    }
+
+    // Local dev JSON fallback only
+    const local = readLocalDb();
+    let localCust = (local.customers || []).find(c => (c.email || '').toLowerCase() === cleanEmail || c.phone === cleanPhone);
+    if (!localCust) {
+      localCust = {
+        id: customerId || `cust-${Date.now()}`,
+        name: customer.name,
+        email: cleanEmail,
+        phone: cleanPhone,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        addresses: [address],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      local.customers.push(localCust);
+    }
+
+    const resolvedItems = [];
+    for (const it of (items || [])) {
+      let validProductId = null;
+      const targetId = it.productId || it.id;
+      if (targetId) {
+        const prodRecord = await this.getProductByIdOrSlug(targetId).catch(() => null);
+        if (prodRecord) validProductId = prodRecord.id;
+      }
+      resolvedItems.push({
+        productId: validProductId,
+        name: it.name,
+        packageType: it.packageType,
+        packageName: it.packageName,
+        price: Number(it.price),
+        quantity: Number(it.quantity),
+        total: Number(it.total),
+        image: it.image || null
+      });
+    }
+
     const newOrder = {
       id: `order-${Date.now()}`,
       orderNumber,
-      customerId,
+      customerId: localCust.id,
       customer: {
         name: customer.name,
-        email: customer.email,
-        phone: customer.phone
+        email: cleanEmail,
+        phone: cleanPhone
       },
       address,
-      items,
+      items: resolvedItems,
       subtotal,
       deliveryFee,
       discount,
       grandTotal,
-      paymentMethod, // 'COD' | 'RAZORPAY' | 'UPI'
-      paymentStatus, // 'PENDING' | 'PAID' | 'FAILED'
+      paymentMethod,
+      paymentStatus,
       orderStatus: 'Order Placed',
       notes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      statusHistory: [
+        {
+          id: `hist-${Date.now()}`,
+          status: 'Order Placed',
+          notes: 'Order confirmed and placed by customer',
+          changedBy: 'CUSTOMER',
+          createdAt: new Date().toISOString()
+        }
+      ],
       timeline: [
         { status: 'Order Placed', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), completed: true },
         { status: 'Confirmed', time: 'Pending', completed: false },
@@ -632,66 +983,28 @@ export const db = {
       ]
     };
 
-    if (isPrismaConnected) {
-      try {
-        // Create full relational order in PostgreSQL
-        const created = await prisma.order.create({
-          data: {
-            id: newOrder.id,
-            orderNumber,
-            customerId,
-            subtotal,
-            deliveryFee,
-            discount,
-            grandTotal,
-            paymentMethod,
-            paymentStatus,
-            orderStatus: 'Order Placed',
-            notes,
-            items: {
-              create: items.map(it => ({
-                productId: it.productId || it.id,
-                name: it.name,
-                packageType: it.packageType,
-                packageName: it.packageName,
-                price: Number(it.price),
-                quantity: Number(it.quantity),
-                total: Number(it.total),
-                image: it.image
-              }))
-            },
-            statusHistory: {
-              create: {
-                status: 'Order Placed',
-                notes: 'Order submitted by customer',
-                changedBy: 'CUSTOMER'
-              }
-            }
-          },
-          include: { items: true, statusHistory: true, customer: true }
-        });
-        return created;
-      } catch (e) {
-        console.warn('Prisma createOrder fallback:', e.message);
-      }
-    }
-
-    const local = readLocalDb();
     local.orders.unshift(newOrder);
     writeLocalDb(local);
     return newOrder;
   },
 
   async getOrderByIdOrNumber(idOrNumber) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.order.findFirst({
-          where: {
-            OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }]
-          },
-          include: { items: true, customer: true, statusHistory: true, payments: true }
-        });
-      } catch (e) {}
+    if (!idOrNumber) return null;
+    const client = await getPrismaClient();
+
+    if (client) {
+      return await client.order.findFirst({
+        where: {
+          OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }]
+        },
+        include: {
+          items: true,
+          customer: true,
+          address: true,
+          statusHistory: { orderBy: { createdAt: 'asc' } },
+          payments: true
+        }
+      });
     }
 
     const local = readLocalDb();
@@ -699,14 +1012,20 @@ export const db = {
   },
 
   async getOrdersByCustomerId(customerId) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.order.findMany({
-          where: { customerId },
-          include: { items: true },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (e) {}
+    if (!customerId) return [];
+    const client = await getPrismaClient();
+
+    if (client) {
+      return await client.order.findMany({
+        where: { customerId },
+        include: {
+          items: true,
+          address: true,
+          statusHistory: { orderBy: { createdAt: 'asc' } },
+          payments: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
     }
 
     const local = readLocalDb();
@@ -714,76 +1033,120 @@ export const db = {
   },
 
   async getAllOrders({ status, search } = {}) {
-    if (isPrismaConnected) {
-      try {
-        const where = {};
-        if (status && status !== 'All') where.orderStatus = status;
-        if (search) {
-          where.OR = [
-            { orderNumber: { contains: search, mode: 'insensitive' } },
-            { customer: { name: { contains: search, mode: 'insensitive' } } },
-            { customer: { phone: { contains: search } } }
-          ];
-        }
-        return await prisma.order.findMany({
-          where,
-          include: { items: true, customer: true, payments: true },
-          orderBy: { createdAt: 'desc' }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+
+    if (client) {
+      const where = {};
+      if (status && status !== 'All') {
+        where.orderStatus = mapOrderStatus(status);
+      }
+      if (search) {
+        where.OR = [
+          { orderNumber: { contains: search, mode: 'insensitive' } },
+          { customer: { name: { contains: search, mode: 'insensitive' } } },
+          { customer: { phone: { contains: search } } },
+          { customer: { email: { contains: search, mode: 'insensitive' } } }
+        ];
+      }
+
+      const orders = await client.order.findMany({
+        where,
+        include: {
+          items: true,
+          customer: true,
+          address: true,
+          statusHistory: { orderBy: { createdAt: 'asc' } },
+          payments: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return orders;
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot retrieve orders. Production PostgreSQL database is unavailable.');
     }
 
     const local = readLocalDb();
     let orders = [...(local.orders || [])];
 
     if (status && status !== 'All') {
-      orders = orders.filter(o => o.orderStatus === status);
+      const mapped = mapOrderStatus(status);
+      orders = orders.filter(o => o.orderStatus === mapped || o.orderStatus === status);
     }
     if (search) {
       const q = search.toLowerCase();
       orders = orders.filter(o =>
-        o.orderNumber.toLowerCase().includes(q) ||
+        (o.orderNumber || '').toLowerCase().includes(q) ||
         (o.customer?.name || '').toLowerCase().includes(q) ||
-        (o.customer?.phone || '').includes(q)
+        (o.customer?.phone || '').includes(q) ||
+        (o.customer?.email || '').toLowerCase().includes(q)
       );
     }
     return orders;
   },
 
   async updateOrderStatus(orderId, newStatus, notes = '', changedBy = 'OWNER') {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.order.update({
-          where: { id: orderId },
-          data: {
-            orderStatus: newStatus,
-            statusHistory: {
-              create: {
-                status: newStatus,
-                notes,
-                changedBy
-              }
+    const mappedStatus = mapOrderStatus(newStatus);
+    const client = await getPrismaClient();
+
+    if (client) {
+      const existing = await client.order.findFirst({
+        where: { OR: [{ id: orderId }, { orderNumber: orderId }] }
+      });
+      if (!existing) return null;
+
+      const updated = await client.order.update({
+        where: { id: existing.id },
+        data: {
+          orderStatus: mappedStatus,
+          statusHistory: {
+            create: {
+              status: mappedStatus,
+              notes: notes || `Order status updated to "${mappedStatus}" by ${changedBy}`,
+              changedBy
             }
-          },
-          include: { items: true, statusHistory: true }
-        });
-      } catch (e) {}
+          }
+        },
+        include: {
+          items: true,
+          customer: true,
+          address: true,
+          statusHistory: { orderBy: { createdAt: 'asc' } },
+          payments: true
+        }
+      });
+      return updated;
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot update order status. Production PostgreSQL database is unavailable.');
     }
 
     const local = readLocalDb();
     const order = (local.orders || []).find(o => o.id === orderId || o.orderNumber === orderId);
     if (order) {
-      order.orderStatus = newStatus;
+      order.orderStatus = mappedStatus;
       order.updatedAt = new Date().toISOString();
 
+      if (!order.statusHistory) order.statusHistory = [];
+      order.statusHistory.push({
+        id: `hist-${Date.now()}`,
+        status: mappedStatus,
+        notes: notes || `Order status updated to "${mappedStatus}" by ${changedBy}`,
+        changedBy,
+        createdAt: new Date().toISOString()
+      });
+
       if (!order.timeline) order.timeline = [];
-      const stepIdx = order.timeline.findIndex(t => t.status === newStatus);
+      const stepIdx = order.timeline.findIndex(t => t.status === mappedStatus);
       if (stepIdx !== -1) {
         order.timeline[stepIdx].completed = true;
         order.timeline[stepIdx].time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } else {
         order.timeline.push({
-          status: newStatus,
+          status: mappedStatus,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           completed: true
         });
@@ -793,35 +1156,49 @@ export const db = {
     return order;
   },
 
+  // ==========================================================================
   // 6. PAYMENTS
+  // ==========================================================================
   async recordPayment({ orderId, gatewayOrderId, gatewayPaymentId, gatewaySignature, amount, currency = 'INR', status, rawData }) {
-    if (isPrismaConnected) {
-      try {
-        const payment = await prisma.payment.create({
+    const client = await getPrismaClient();
+
+    if (client) {
+      const existing = await client.order.findFirst({
+        where: { OR: [{ id: orderId }, { orderNumber: orderId }] }
+      });
+      if (!existing) return null;
+
+      const payment = await client.payment.create({
+        data: {
+          orderId: existing.id,
+          gateway: 'RAZORPAY',
+          gatewayOrderId,
+          gatewayPaymentId,
+          gatewaySignature,
+          amount: Number(amount),
+          currency,
+          status,
+          rawWebhookData: typeof rawData === 'string' ? rawData : JSON.stringify(rawData || {})
+        }
+      });
+
+      if (status === 'SUCCESS' || status === 'PAID') {
+        await client.order.update({
+          where: { id: existing.id },
           data: {
-            orderId,
-            gateway: 'RAZORPAY',
-            gatewayOrderId,
-            gatewayPaymentId,
-            gatewaySignature,
-            amount,
-            currency,
-            status,
-            rawWebhookData: typeof rawData === 'string' ? rawData : JSON.stringify(rawData || {})
+            paymentStatus: 'Paid',
+            orderStatus: 'Confirmed',
+            statusHistory: {
+              create: {
+                status: 'Confirmed',
+                notes: `Payment verified via Razorpay (${gatewayPaymentId})`,
+                changedBy: 'SYSTEM'
+              }
+            }
           }
         });
-
-        if (status === 'SUCCESS' || status === 'PAID') {
-          await prisma.order.update({
-            where: { id: orderId },
-            data: {
-              paymentStatus: 'Paid',
-              orderStatus: 'Confirmed'
-            }
-          });
-        }
-        return payment;
-      } catch (e) {}
+      }
+      return payment;
     }
 
     const local = readLocalDb();
@@ -841,7 +1218,6 @@ export const db = {
 
     local.payments.push(payment);
 
-    // Update order status
     const order = (local.orders || []).find(o => o.id === orderId || o.orderNumber === orderId);
     if (order && (status === 'SUCCESS' || status === 'PAID')) {
       order.paymentStatus = 'Paid';
@@ -853,8 +1229,71 @@ export const db = {
     return payment;
   },
 
-  // 7. ADMIN STATS & REVENUE (Derived strictly from genuine DB records!)
+  // ==========================================================================
+  // 7. ADMIN STATS & REVENUE (Live Database Aggregations)
+  // ==========================================================================
   async getAdminStats() {
+    const client = await getPrismaClient();
+
+    if (client) {
+      const [
+        totalOrders,
+        totalCustomers,
+        pendingOrders,
+        confirmedOrders,
+        deliveredOrders,
+        cancelledOrders,
+        paidOrders
+      ] = await Promise.all([
+        client.order.count(),
+        client.customer.count(),
+        client.order.count({
+          where: { orderStatus: { in: ['Order Placed', 'Confirmed', 'Preparing'] } }
+        }),
+        client.order.count({
+          where: { orderStatus: 'Confirmed' }
+        }),
+        client.order.count({
+          where: { orderStatus: 'Delivered' }
+        }),
+        client.order.count({
+          where: { orderStatus: { in: ['Cancelled', 'Rejected'] } }
+        }),
+        client.order.findMany({
+          where: {
+            OR: [
+              { paymentStatus: { in: ['Paid', 'PAID', 'Success', 'SUCCESS'] } },
+              {
+                paymentMethod: { in: ['COD', 'Cash on Delivery', 'Cash On Delivery', 'cash on delivery'] },
+                orderStatus: 'Delivered'
+              }
+            ]
+          },
+          select: { grandTotal: true, paymentMethod: true }
+        })
+      ]);
+
+      const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
+      const avgOrderValue = paidOrders.length > 0 ? Math.round(totalRevenue / paidOrders.length) : 0;
+
+      return {
+        totalCustomers,
+        totalOrders,
+        pendingOrders,
+        confirmedOrders,
+        deliveredOrders,
+        cancelledOrders,
+        totalRevenue,
+        avgOrderValue,
+        onlinePaymentsCount: paidOrders.filter(o => o.paymentMethod === 'RAZORPAY' || o.paymentMethod === 'UPI').length,
+        codOrdersCount: paidOrders.filter(o => o.paymentMethod === 'COD').length
+      };
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot retrieve statistics. Production PostgreSQL database is unavailable.');
+    }
+
     const orders = await this.getAllOrders();
     const customers = await this.getAllCustomers();
 
@@ -864,11 +1303,21 @@ export const db = {
     const deliveredOrders = orders.filter(o => o.orderStatus === 'Delivered').length;
     const cancelledOrders = orders.filter(o => o.orderStatus === 'Cancelled').length;
 
-    // REVENUE CALCULATION RULE:
-    // Revenue is calculated ONLY from verified successful online payments and genuinely completed/delivered COD orders!
+    const isCod = (method) => {
+      if (!method) return false;
+      const m = method.toLowerCase();
+      return m === 'cod' || m.includes('cash on delivery');
+    };
+
+    const isPaid = (status) => {
+      if (!status) return false;
+      const s = status.toLowerCase();
+      return s === 'paid' || s === 'success';
+    };
+
     const paidOrders = orders.filter(o =>
-      (o.paymentStatus === 'Paid') ||
-      (o.paymentMethod === 'COD' && o.orderStatus === 'Delivered')
+      isPaid(o.paymentStatus) ||
+      (isCod(o.paymentMethod) && o.orderStatus === 'Delivered')
     );
 
     const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.grandTotal || 0), 0);
@@ -888,27 +1337,31 @@ export const db = {
     };
   },
 
+  // ==========================================================================
   // 8. SETTINGS
+  // ==========================================================================
   async getSettings() {
-    if (isPrismaConnected) {
-      try {
-        const s = await prisma.storeSettings.findUnique({ where: { id: 'default' } });
-        if (s) return s;
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      const s = await client.storeSettings.findUnique({ where: { id: 'default' } }).catch(() => null);
+      if (s) return s;
     }
     const local = readLocalDb();
     return local.settings;
   },
 
   async updateSettings(newSettings) {
-    if (isPrismaConnected) {
-      try {
-        return await prisma.storeSettings.upsert({
-          where: { id: 'default' },
-          update: newSettings,
-          create: { id: 'default', ...newSettings }
-        });
-      } catch (e) {}
+    const client = await getPrismaClient();
+    if (client) {
+      return await client.storeSettings.upsert({
+        where: { id: 'default' },
+        update: newSettings,
+        create: { id: 'default', ...newSettings }
+      });
+    }
+
+    if (isProduction) {
+      throw new Error('Database Error: Cannot update store settings in production. PostgreSQL required.');
     }
 
     const local = readLocalDb();
@@ -917,4 +1370,3 @@ export const db = {
     return local.settings;
   }
 };
-

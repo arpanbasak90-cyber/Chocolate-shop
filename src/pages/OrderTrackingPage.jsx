@@ -71,16 +71,28 @@ export const OrderTrackingPage = () => {
     }
   };
 
+  const normalizeStatus = (status) => {
+    if (!status) return 'Order Placed';
+    if (status === 'Order Confirmed' || status === 'Confirmed') return 'Confirmed';
+    if (status === 'Preparing Your Chocolates' || status === 'Preparing') return 'Preparing';
+    if (status === 'Out for Delivery') return 'Out for Delivery';
+    if (status === 'Delivered') return 'Delivered';
+    if (status === 'Cancelled' || status === 'Rejected') return 'Cancelled';
+    return status;
+  };
+
   const statusSteps = [
-    { name: 'Order Placed', desc: 'Order received by boutique kitchen', icon: Package },
-    { name: 'Order Confirmed', desc: 'Ingredients & chocolates allocated', icon: CheckCircle2 },
-    { name: 'Preparing Your Chocolates', desc: 'Small-batch tempering & gift wrapping', icon: Clock },
-    { name: 'Out for Delivery', desc: 'On its way in chilled insulated bag', icon: Truck },
-    { name: 'Delivered', desc: 'Handed over fresh & delicious', icon: Home },
+    { key: 'Order Placed', name: 'Order Placed', desc: 'Order received by boutique kitchen', icon: Package },
+    { key: 'Confirmed', name: 'Order Confirmed', desc: 'Ingredients & chocolates allocated', icon: CheckCircle2 },
+    { key: 'Preparing', name: 'Preparing Chocolates', desc: 'Small-batch tempering & gift wrapping', icon: Clock },
+    { key: 'Out for Delivery', name: 'Out for Delivery', desc: 'On its way in chilled insulated bag', icon: Truck },
+    { key: 'Delivered', name: 'Delivered', desc: 'Handed over fresh & delicious', icon: Home },
   ];
 
-  const currentStatusIndex = statusSteps.findIndex(
-    (s) => s.name === selectedOrder?.orderStatus
+  const currentStatusNormalized = normalizeStatus(selectedOrder?.orderStatus);
+  const isCancelled = currentStatusNormalized === 'Cancelled';
+  const currentStatusIndex = isCancelled ? -1 : statusSteps.findIndex(
+    (s) => s.key === currentStatusNormalized
   );
 
   return (
@@ -175,32 +187,45 @@ export const OrderTrackingPage = () => {
           </div>
 
           {/* Stepper Timeline */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-chocolate-900 mb-6">
-              Order Fulfillment Progress
-            </h4>
-
-            <div className="relative">
-              {/* Stepper Line */}
-              <div className="hidden md:block absolute top-6 left-6 right-6 h-1 bg-cream-200 -z-0">
-                <div
-                  className="h-full bg-gradient-to-r from-caramel-600 to-gold-400 transition-all duration-500"
-                  style={{
-                    width: `${Math.max(
-                      0,
-                      (currentStatusIndex / (statusSteps.length - 1)) * 100
-                    )}%`
-                  }}
-                ></div>
+          {isCancelled ? (
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <h5 className="font-bold text-xs">Order Status: Cancelled</h5>
+                <p className="text-[11px] text-red-600 mt-0.5">
+                  This order was cancelled. If you have already paid or need assistance, please contact store support via WhatsApp.
+                </p>
               </div>
+            </div>
+          ) : (
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-chocolate-900 mb-6">
+                Order Fulfillment Progress
+              </h4>
 
-              {/* Steps */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-2 relative z-10">
-                {statusSteps.map((step, idx) => {
-                  const Icon = step.icon;
-                  const isCompleted = idx <= currentStatusIndex;
-                  const isCurrent = idx === currentStatusIndex;
-                  const historyItem = (selectedOrder.statusHistory || []).find((h) => h.status === step.name);
+              <div className="relative">
+                {/* Stepper Line */}
+                <div className="hidden md:block absolute top-6 left-6 right-6 h-1 bg-cream-200 -z-0">
+                  <div
+                    className="h-full bg-gradient-to-r from-caramel-600 to-gold-400 transition-all duration-500"
+                    style={{
+                      width: `${Math.max(
+                        0,
+                        (currentStatusIndex / (statusSteps.length - 1)) * 100
+                      )}%`
+                    }}
+                  ></div>
+                </div>
+
+                {/* Steps */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-2 relative z-10">
+                  {statusSteps.map((step, idx) => {
+                    const Icon = step.icon;
+                    const isCompleted = idx <= currentStatusIndex;
+                    const isCurrent = idx === currentStatusIndex;
+                    const historyItem = (selectedOrder.statusHistory || []).find(
+                      (h) => normalizeStatus(h.status) === step.key || h.status === step.name
+                    );
                   const stepTime = historyItem
                     ? new Date(historyItem.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     : isCompleted ? 'Completed' : 'Pending';
@@ -244,6 +269,7 @@ export const OrderTrackingPage = () => {
               </div>
             </div>
           </div>
+        )}
 
           {/* Owner Quick Controls (Visible only when logged in as Shopkeeper) */}
           {isAdminLoggedIn && (

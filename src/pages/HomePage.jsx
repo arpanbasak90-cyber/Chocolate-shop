@@ -31,9 +31,9 @@ export const HomePage = () => {
   // Bestsellers (Top 4 products)
   const bestsellers = products.filter((p) => p.isBestseller).slice(0, 4);
 
-  // Special Chocolates (Rasmalai, Gulkand, Celebration Hamper)
+  // Special Chocolates (Rasmalai Chocolate & Gulkand Bite)
   const specialChocolates = products.filter(
-    (p) => p.category === 'Indian Fusion' || p.category === 'Gift Hampers'
+    (p) => p.category === 'Indian Fusion'
   );
 
   // Filtered Collection
@@ -254,7 +254,7 @@ export const HomePage = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {specialChocolates.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
