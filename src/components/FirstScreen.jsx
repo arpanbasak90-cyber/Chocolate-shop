@@ -3,26 +3,24 @@ import { useShop } from '../context/ShopContext';
 import { ShoppingBag, Store, ArrowRight, User, Mail, Phone, KeyRound, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const FirstScreen = () => {
-  const { sendCustomerOtp, verifyCustomerOtp, sendAdminOtp, verifyAdminOtp, addToast } = useShop();
+  const { customerLogin, sendAdminOtp, verifyAdminOtp, addToast } = useShop();
 
-  // Mode: null | 'customer-step1' | 'customer-step2' | 'shopkeeper-step1' | 'shopkeeper-step2'
+  // Mode: null | 'customer-step1' | 'shopkeeper-step1' | 'shopkeeper-step2'
   const [activeView, setActiveView] = useState(null);
 
   // Customer Form State
   const [custName, setCustName] = useState('');
   const [custEmail, setCustEmail] = useState('');
   const [custPhone, setCustPhone] = useState('');
-  const [custEmailOtp, setCustEmailOtp] = useState('');
 
-  // Shopkeeper Form State - Default to Arpan's registered email matching the Resend API account
-  const [adminEmail, setAdminEmail] = useState('arpanbasak90@gmail.com');
+  // Shopkeeper Form State - Default to Abhijit's registered owner email
+  const [adminEmail, setAdminEmail] = useState('abhijitsaha23485@gmail.com');
   const [adminEmailOtp, setAdminEmailOtp] = useState('');
 
   // Loading & status states
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
-  const [devCodeInfo, setDevCodeInfo] = useState('');
   const [countdown, setCountdown] = useState(0);
 
   // Timer countdown
@@ -34,51 +32,24 @@ export const FirstScreen = () => {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  // Handle Customer Step 1: Send Email OTP
-  const handleCustomerSendOtp = async (e) => {
+  // Handle Customer Direct Instant Login (No OTP verification required)
+  const handleCustomerLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setDevCodeInfo('');
     if (!custName.trim() || !custEmail.trim()) {
       setErrorMessage('Please fill in your Full Name and Email address.');
       return;
     }
     setIsLoading(true);
     try {
-      const res = await sendCustomerOtp({
+      await customerLogin({
         name: custName.trim(),
         email: custEmail.trim(),
         phone: custPhone.trim() || '9898014090'
       });
-      setActiveView('customer-step2');
-      setCountdown(300); // 5 minutes
-      setSuccessInfo(res?.message || `Verification code dispatched to ${custEmail.trim()}.`);
-      setCustEmailOtp('');
+      // Authenticated session established - FirstScreen automatically closes
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to dispatch verification code.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle Customer Step 2: Verify Email OTP
-  const handleCustomerVerify = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    if (!custEmailOtp.trim()) {
-      setErrorMessage('Please enter the 6-digit Email OTP to authenticate.');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      await verifyCustomerOtp({
-        name: custName.trim(),
-        email: custEmail.trim(),
-        phone: custPhone.trim(),
-        emailOtp: custEmailOtp.trim()
-      });
-    } catch (err) {
-      setErrorMessage(err.message || 'Verification failed. Please check your Email OTP code.');
+      setErrorMessage(err.message || 'Failed to sign in. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +59,6 @@ export const FirstScreen = () => {
   const handleAdminSendOtp = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setDevCodeInfo('');
     if (!adminEmail.trim()) {
       setErrorMessage('Please enter registered Owner Email address.');
       return;
@@ -225,7 +195,7 @@ export const FirstScreen = () => {
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 2: CUSTOMER STEP 1 — ENTER DETAILS TO REQUEST EMAIL OTP
+            VIEW 2: CUSTOMER LOGIN & REGISTRATION (DIRECT ACCESS - NO OTP REQUIRED)
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === 'customer-step1' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
@@ -237,7 +207,7 @@ export const FirstScreen = () => {
                 Customer Registration & Login
               </h2>
               <p className="text-xs text-stone-600">
-                Enter your details to receive an Email verification code.
+                Enter your details to start shopping handcrafted chocolates.
               </p>
             </div>
 
@@ -248,7 +218,7 @@ export const FirstScreen = () => {
               </div>
             )}
 
-            <form onSubmit={handleCustomerSendOtp} className="space-y-4">
+            <form onSubmit={handleCustomerLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
                   Full Name *
@@ -268,7 +238,7 @@ export const FirstScreen = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Email Address (Gmail) *
+                  Email Address *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -309,10 +279,10 @@ export const FirstScreen = () => {
                   {isLoading ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Sending Email OTP...</span>
+                      <span>Logging in...</span>
                     </>
                   ) : (
-                    <span>Send Verification OTP →</span>
+                    <span>Enter Zora Shop →</span>
                   )}
                 </button>
 
@@ -327,104 +297,13 @@ export const FirstScreen = () => {
             </form>
 
             <div className="text-[11px] text-center text-stone-500">
-              🔒 Real Email Verification: A 6-digit OTP will be delivered directly to your email inbox.
+              ✨ Instant Access: No verification code required for customers. Enter your details and start shopping immediately.
             </div>
           </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 3: CUSTOMER STEP 2 — ENTER EMAIL OTP
-        ══════════════════════════════════════════════════════════════════════════ */}
-        {activeView === 'customer-step2' && (
-          <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">
-            <div className="text-center space-y-1">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-900 flex items-center justify-center text-2xl text-emerald-300 shadow-md">
-                <KeyRound className="w-7 h-7" />
-              </div>
-              <h2 className="font-serif text-2xl font-bold text-[#3c1b11]">
-                Verify Email OTP
-              </h2>
-              <p className="text-xs text-stone-600">
-                Code sent to <strong>{custEmail}</strong>
-              </p>
-            </div>
-
-            {successInfo && (
-              <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2 font-medium">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>{successInfo}</span>
-              </div>
-            )}
-
-
-            {errorMessage && (
-              <div className="p-3 rounded-xl bg-red-100 border border-red-300 text-red-800 text-xs flex items-center gap-2 font-medium">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCustomerVerify} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#3c1b11] uppercase tracking-wider mb-1">
-                  Email OTP Code (6 digits) *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={custEmailOtp}
-                    onChange={(e) => setCustEmailOtp(e.target.value)}
-                    placeholder="Enter 6-digit Email OTP"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-cream-300 text-sm font-mono tracking-widest text-chocolate-950 font-bold focus:outline-none focus:ring-2 focus:ring-caramel-500 text-center"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-stone-600 pt-1">
-                <span>⏱️ Valid: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}</span>
-                <button
-                  type="button"
-                  disabled={countdown > 0 || isLoading}
-                  onClick={handleCustomerSendOtp}
-                  className={`font-bold ${countdown > 0 ? 'text-stone-400 cursor-not-allowed' : 'text-caramel-700 hover:underline'}`}
-                >
-                  Resend Email OTP
-                </button>
-              </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs tracking-wider uppercase shadow-md transition flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Code...</span>
-                    </>
-                  ) : (
-                    <span>Verify & Start Shopping →</span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveView('customer-step1')}
-                  className="w-full py-2 text-xs font-bold text-stone-600 hover:text-chocolate-950"
-                >
-                  ← Edit Contact Details
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════════════
-            VIEW 4: SHOPKEEPER STEP 1 — OWNER EMAIL
+            VIEW 3: SHOPKEEPER STEP 1 — OWNER EMAIL
         ══════════════════════════════════════════════════════════════════════════ */}
         {activeView === 'shopkeeper-step1' && (
           <div className="max-w-md mx-auto bg-[#f2ebd9] rounded-3xl p-6 sm:p-8 border-2 border-[#e6d8be] shadow-2xl animate-fadeIn space-y-6">

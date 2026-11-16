@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  customerLogin,
   sendCustomerOtp,
   verifyCustomerOtp,
   getCustomerMe,
@@ -15,13 +16,14 @@ import { otpRateLimiter, verifyOtpRateLimiter } from '../middleware/rateLimiter.
 
 const router = express.Router();
 
-// Customer Auth (Dual OTP)
-router.post('/customer/send-otp', otpRateLimiter, sendCustomerOtp);
-router.post('/customer/verify-otp', verifyOtpRateLimiter, verifyCustomerOtp);
+// Customer Auth (Direct Login - No Email Verification Required)
+router.post('/customer/login', customerLogin);
+router.post('/customer/send-otp', customerLogin);
+router.post('/customer/verify-otp', customerLogin);
 router.get('/customer/me', requireCustomer, getCustomerMe);
 router.post('/customer/logout', customerLogout);
 
-// Admin Auth (Dual OTP)
+// Admin Auth (Strict Email OTP Verification for Shop Owner)
 router.post('/admin/send-otp', otpRateLimiter, sendAdminOtp);
 router.post('/admin/verify-otp', verifyOtpRateLimiter, verifyAdminOtp);
 router.get('/admin/me', requireAdmin, getAdminMe);

@@ -200,22 +200,10 @@ export const ShopProvider = ({ children }) => {
   // REAL AUTHENTICATION ACTIONS (Email OTP Verification via Resend)
   // ==========================================================================
 
-  // Customer: Request Email OTP
-  const sendCustomerOtp = async ({ name, email, phone }) => {
+  // Customer: Direct Instant Login (No Email Verification Required)
+  const customerLogin = async ({ name, email, phone }) => {
     try {
-      const res = await api.sendCustomerOtp({ name, email, phone });
-      addToast('Verification code sent to your Email address!', 'info');
-      return res;
-    } catch (err) {
-      addToast(err.message, 'warning');
-      throw err;
-    }
-  };
-
-  // Customer: Verify Email OTP
-  const verifyCustomerOtp = async ({ name, email, phone, emailOtp }) => {
-    try {
-      const res = await api.verifyCustomerOtp({ name, email, phone, emailOtp });
+      const res = await api.customerLogin({ name, email, phone });
       if (res.success && res.customer) {
         setCurrentCustomer(res.customer);
         setSessionRole('customer');
@@ -227,6 +215,9 @@ export const ShopProvider = ({ children }) => {
       throw err;
     }
   };
+
+  const sendCustomerOtp = customerLogin;
+  const verifyCustomerOtp = customerLogin;
 
   // Customer: Logout
   const customerLogout = async () => {
@@ -471,7 +462,8 @@ export const ShopProvider = ({ children }) => {
         adminUser,
         isAuthChecking,
 
-        // Customer Dual-OTP Auth
+        // Customer Auth (Instant Direct Login)
+        customerLogin,
         sendCustomerOtp,
         verifyCustomerOtp,
         customerLogout,

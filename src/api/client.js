@@ -61,16 +61,11 @@ export const api = {
   },
   getProduct: (idOrSlug) => request(`/products/${idOrSlug}`),
 
-  // Customer Auth (Email OTP)
-  sendCustomerOtp: ({ name, email, phone }) =>
-    request('/auth/customer/send-otp', {
+  // Customer Auth (Direct Login - No Email Verification Required)
+  customerLogin: async ({ name, email, phone }) => {
+    const data = await request('/auth/customer/login', {
       method: 'POST',
       body: JSON.stringify({ name, email, phone })
-    }),
-  verifyCustomerOtp: async ({ name, email, phone, emailOtp }) => {
-    const data = await request('/auth/customer/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, phone, emailOtp })
     });
     if (data?.token && typeof window !== 'undefined') {
       localStorage.setItem('zora_auth_token', data.token);
@@ -78,6 +73,8 @@ export const api = {
     }
     return data;
   },
+  sendCustomerOtp: (params) => api.customerLogin(params),
+  verifyCustomerOtp: (params) => api.customerLogin(params),
   getCustomerMe: () => request('/auth/customer/me'),
   customerLogout: async () => {
     if (typeof window !== 'undefined') {

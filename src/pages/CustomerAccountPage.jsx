@@ -23,8 +23,7 @@ import {
 export const CustomerAccountPage = () => {
   const {
     currentCustomer,
-    sendCustomerOtp,
-    verifyCustomerOtp,
+    customerLogin,
     updateCustomerProfile,
     customerLogout,
     orders,
@@ -34,74 +33,34 @@ export const CustomerAccountPage = () => {
 
   const navigate = useNavigate();
 
-  // Email OTP Auth Step: 1 = Enter Details, 2 = Verify Email OTP
-  const [authStep, setAuthStep] = useState(1);
+  // Customer Login Form State (Instant Direct Login)
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [emailOtp, setEmailOtp] = useState('');
-  const [devCodeInfo, setDevCodeInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [countdown, setCountdown] = useState(0);
-
-  // Timer countdown
-  useEffect(() => {
-    let timer;
-    if (countdown > 0) {
-      timer = setInterval(() => setCountdown((c) => c - 1), 1000);
-    }
-    return () => clearInterval(timer);
-  }, [countdown]);
 
   // Edit profile toggle
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
 
-  // Handle Step 1: Request Email OTP
-  const handleRequestOtp = async (e) => {
+  // Handle Direct Customer Login / Registration (No Verification Code Required)
+  const handleCustomerLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setDevCodeInfo('');
     if (!name.trim() || !email.trim()) {
       setErrorMessage('Please fill in your Full Name and Email address.');
       return;
     }
     setIsLoading(true);
     try {
-      const res = await sendCustomerOtp({
+      await customerLogin({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || '9898014090'
       });
-      setAuthStep(2);
-      setCountdown(300);
-      setEmailOtp('');
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to dispatch verification code.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle Step 2: Verify Email OTP
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    if (!emailOtp.trim()) {
-      setErrorMessage('Please enter the 6-digit Email OTP.');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      await verifyCustomerOtp({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        emailOtp: emailOtp.trim()
-      });
-    } catch (err) {
-      setErrorMessage(err.message || 'Verification failed. Please check your code.');
+      setErrorMessage(err.message || 'Failed to complete sign in. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -137,7 +96,7 @@ export const CustomerAccountPage = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-fadeIn">
       
-      {/* 1. NOT LOGGED IN VIEW: DUAL OTP AUTHENTICATION */}
+      {/* 1. NOT LOGGED IN VIEW: INSTANT DIRECT CUSTOMER LOGIN */}
       {!currentCustomer ? (
         <div className="max-w-md mx-auto space-y-6">
           
@@ -149,179 +108,97 @@ export const CustomerAccountPage = () => {
               Customer Account Portal
             </h1>
             <p className="text-xs text-stone-500">
-              Secure Email OTP Verification. Sign in or register in seconds.
+              Sign in or create your account in seconds. Instant access.
             </p>
           </div>
 
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-cream-300 shadow-xl space-y-5 animate-fadeIn">
-            {authStep === 1 ? (
-              <form onSubmit={handleRequestOtp} className="space-y-4">
-                <div className="pb-3 border-b border-cream-200">
-                  <h3 className="font-serif text-lg font-bold text-chocolate-950">
-                    Enter Contact Details
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    We will send a 6-digit verification code to your email address.
-                  </p>
+            <form onSubmit={handleCustomerLogin} className="space-y-4">
+              <div className="pb-3 border-b border-cream-200">
+                <h3 className="font-serif text-lg font-bold text-chocolate-950">
+                  Customer Sign In
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Enter your details to manage orders and track deliveries.
+                </p>
+              </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{errorMessage}</span>
                 </div>
+              )}
 
-                {errorMessage && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
-
-
-                <div>
-                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Full Name *
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Radhika Mehta"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Email Address *
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="yourname@gmail.com"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Mobile Number (Contact & Orders) *
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="9876543210"
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 rounded-xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Sending Verification Code...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Send Verification Code</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="pb-3 border-b border-cream-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-serif text-lg font-bold text-chocolate-950">
-                      Verify Email OTP
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setAuthStep(1)}
-                      className="text-xs text-caramel-700 hover:underline font-bold"
-                    >
-                      Change Details
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Code sent to <strong>{email}</strong>
-                  </p>
-                </div>
-
-                {errorMessage && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
-
-
-                <div>
-                  <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
-                    Email OTP (6 digits) *
-                  </label>
+              <div>
+                <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                  Full Name *
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
-                    maxLength={6}
-                    value={emailOtp}
-                    onChange={(e) => setEmailOtp(e.target.value)}
-                    placeholder="Enter 6-digit email code"
-                    className="w-full px-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-center font-mono tracking-widest text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Radhika Mehta"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between text-[11px] text-stone-500">
-                  <span>
-                    {countdown > 0 ? (
-                      `Code expires in ${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`
-                    ) : (
-                      <span className="text-red-600 font-bold">Code expired</span>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={countdown > 240 || isLoading}
-                    onClick={handleRequestOtp}
-                    className="text-caramel-700 font-bold hover:underline disabled:opacity-40"
-                  >
-                    Resend Code
-                  </button>
+              <div>
+                <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                  Email Address *
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="yourname@gmail.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                  />
                 </div>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Code...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Verify & Access Customer Account</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
+              <div>
+                <label className="block text-xs font-bold text-chocolate-950 uppercase tracking-wider mb-1">
+                  Mobile Number (Contact & Orders) *
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="9876543210"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-cream-50 border border-cream-300 text-xs text-chocolate-950 focus:outline-none focus:ring-2 focus:ring-caramel-400"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In & Access Account</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
           </div>
 
         </div>

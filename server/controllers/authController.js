@@ -16,9 +16,9 @@ function generateSecureOtp() {
 }
 
 /**
- * 1. CUSTOMER: Initiate Email OTP Verification
+ * 1. CUSTOMER: Direct Frictionless Login / Registration (No Email Verification Required)
  */
-export async function sendCustomerOtp(req, res) {
+export async function customerLogin(req, res) {
   try {
     const { name, email, phone } = req.body;
 
@@ -34,91 +34,20 @@ export async function sendCustomerOtp(req, res) {
       ? (cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`)
       : (cleanPhone ? `+91${cleanPhone}` : '+910000000000');
 
-    // Generate secure 6-digit Email OTP
-    const emailOtp = generateSecureOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes validity
-
-    // Store hashed OTP record in DB
-    await db.saveOtp({
-      identifier: cleanEmail,
-      channel: 'EMAIL',
-      type: 'CUSTOMER_AUTH',
-      otpHash: hashOtp(emailOtp),
-      expiresAt
-    });
-
-    // Deliver Real OTP to customer's email
-    const delivery = await sendEmailOtp({ toEmail: cleanEmail, otpCode: emailOtp, recipientName: name.trim(), isOwner: false });
-
-    return res.status(200).json({
-      success: true,
-      message: delivery?.deliveredToInbox
-        ? `A 6-digit verification code has been delivered to ${cleanEmail}. (Check inbox or spam on your mobile/computer)`
-        : `Verification code dispatched to ${cleanEmail}. Please check your inbox.`,
-      details: {
-        email: cleanEmail,
-        phone: formattedPhone,
-        expiresInMinutes: 5,
-        deliveredToInbox: !!delivery?.deliveredToInbox
-      }
-    });
-  } catch (error) {
-    console.error('Error in sendCustomerOtp:', error);
-    return res.status(500).json({ success: false, message: 'Failed to send verification code. Please try again.' });
-  }
-}
-
-/**
- * 2. CUSTOMER: Complete Email OTP Verification
- */
-export async function verifyCustomerOtp(req, res) {
-  try {
-    const { name, email, phone, emailOtp } = req.body;
-
-    if (!email || !emailOtp) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email address and 6-digit Email OTP must be provided.'
-      });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPhone = (phone || '').replace(/\D/g, '');
-    const formattedPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : (cleanPhone ? `+${cleanPhone}` : '');
-
-    // Verify Email OTP
-    const emailRecord = await db.getLatestOtp({ identifier: cleanEmail, channel: 'EMAIL', type: 'CUSTOMER_AUTH' });
-    if (!emailRecord) {
-      return res.status(400).json({ success: false, message: 'No active OTP found for this email. Please request a new code.' });
-    }
-    if (new Date() > new Date(emailRecord.expiresAt)) {
-      return res.status(400).json({ success: false, message: 'The Email OTP has expired. Please request a new code.' });
-    }
-    if (emailRecord.attempts >= 5) {
-      return res.status(400).json({ success: false, message: 'Too many incorrect Email OTP attempts. Please request a fresh code.' });
-    }
-    if (emailRecord.otpHash !== hashOtp(emailOtp.trim())) {
-      await db.incrementOtpAttempts(emailRecord.id);
-      return res.status(400).json({ success: false, message: 'Invalid Email OTP code. Please check and re-enter.' });
-    }
-
-    // Mark OTP as verified to prevent replay
-    await db.markOtpVerified(emailRecord.id);
-
-    // Create or retrieve verified customer record in DB
+    // Create or retrieve customer record directly in the database
     const customer = await db.createOrUpdateCustomer({
-      name: (name || 'Chocolate Lover').trim(),
+      name: name.trim(),
       email: cleanEmail,
       phone: formattedPhone
     });
 
-    // Sign session token and set secure HTTP-only cookie
+    // Establish authenticated session with JWT and secure cookie
     const token = signToken({ id: customer.id, email: customer.email, role: 'CUSTOMER' });
     setAuthCookie(res, COOKIE_NAME_CUSTOMER, token);
 
     return res.status(200).json({
       success: true,
-      message: 'Email address verified successfully!',
+      message: `Welcome to Zora Shop, ${customer.name}!`,
       customer: {
         id: customer.id,
         name: customer.name,
@@ -129,10 +58,14 @@ export async function verifyCustomerOtp(req, res) {
       token
     });
   } catch (error) {
-    console.error('Error in verifyCustomerOtp:', error);
-    return res.status(500).json({ success: false, message: 'Verification error. Please try again.' });
+    console.error('Error in customerLogin:', error);
+    return res.status(500).json({ success: false, message: 'Failed to complete login. Please try again.' });
   }
 }
+
+// Backward-compatible aliases for customer auth routes
+export const sendCustomerOtp = customerLogin;
+export const verifyCustomerOtp = customerLogin;
 
 /**
  * 3. CUSTOMER: Get Current Profile
