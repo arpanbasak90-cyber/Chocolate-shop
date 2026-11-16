@@ -785,7 +785,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                     </div>
 
                     <div className="text-[10px] font-bold uppercase text-caramel-400">
-                      {prod.category}
+                      {typeof prod.category === 'object' && prod.category !== null ? (prod.category.name || 'Classics') : (prod.category || 'Classics')}
                     </div>
                     <h3 className="font-serif text-base font-bold text-white mt-0.5">
                       {prod.name}

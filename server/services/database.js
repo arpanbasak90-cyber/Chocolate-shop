@@ -237,6 +237,26 @@ function writeLocalDb(data) {
 // ============================================================================
 // UNIFIED DATABASE SERVICE
 // ============================================================================
+function formatProductRecord(p) {
+  if (!p) return null;
+  const categoryName = p.category && typeof p.category === 'object' ? p.category.name : (p.category || 'Classics');
+  let ingredients = p.ingredients;
+  if (typeof ingredients === 'string') {
+    try {
+      ingredients = JSON.parse(ingredients);
+    } catch {
+      ingredients = [ingredients];
+    }
+  }
+  return {
+    ...p,
+    category: categoryName,
+    categoryName,
+    categoryObj: typeof p.category === 'object' ? p.category : null,
+    ingredients: Array.isArray(ingredients) ? ingredients : []
+  };
+}
+
 export const db = {
   get prisma() {
     return globalPrisma;
@@ -313,7 +333,7 @@ export const db = {
         orderBy,
         include: { category: true }
       });
-      return products;
+      return products.map(formatProductRecord);
     }
 
     const local = readLocalDb();
@@ -333,7 +353,7 @@ export const db = {
     if (sortBy === 'price-high') prods.sort((a, b) => b.piecePrice - a.piecePrice);
     if (sortBy === 'rating') prods.sort((a, b) => b.rating - a.rating);
 
-    return prods;
+    return prods.map(formatProductRecord);
   },
 
   async getProductByIdOrSlug(idOrSlug) {
@@ -354,16 +374,17 @@ export const db = {
         },
         include: { category: true }
       });
-      if (prod) return prod;
+      if (prod) return formatProductRecord(prod);
     }
 
     const local = readLocalDb();
-    return (local.products || []).find(p =>
+    const localProd = (local.products || []).find(p =>
       p.id === cleanId ||
       p.id === mappedId ||
       p.slug === cleanId ||
       p.slug === mappedId
-    ) || null;
+    );
+    return localProd ? formatProductRecord(localProd) : null;
   },
 
   async createProduct(data) {
@@ -394,7 +415,8 @@ export const db = {
 
     const client = await getPrismaClient();
     if (client) {
-      return await client.product.create({ data: newProduct });
+      const created = await client.product.create({ data: newProduct });
+      return formatProductRecord(created);
     }
 
     if (isProduction) {
@@ -404,16 +426,17 @@ export const db = {
     const local = readLocalDb();
     local.products.unshift(newProduct);
     writeLocalDb(local);
-    return newProduct;
+    return formatProductRecord(newProduct);
   },
 
   async updateProduct(id, data) {
     const client = await getPrismaClient();
     if (client) {
-      return await client.product.update({
+      const updated = await client.product.update({
         where: { id },
         data
       });
+      return formatProductRecord(updated);
     }
 
     if (isProduction) {
@@ -429,7 +452,7 @@ export const db = {
       updatedAt: new Date().toISOString()
     };
     writeLocalDb(local);
-    return local.products[idx];
+    return formatProductRecord(local.products[idx]);
   },
 
   async deleteProduct(id) {

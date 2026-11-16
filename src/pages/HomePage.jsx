@@ -33,13 +33,13 @@ export const HomePage = () => {
 
   // Special Chocolates (Rasmalai Chocolate & Gulkand Bite)
   const specialChocolates = products.filter(
-    (p) => p.category === 'Indian Fusion'
+    (p) => ((typeof p.category === 'object' && p.category !== null ? p.category.name : p.category) === 'Indian Fusion')
   );
 
   // Filtered Collection
   const collectionProducts = selectedCategory === 'All Chocolates'
     ? products
-    : products.filter((p) => p.category === selectedCategory);
+    : products.filter((p) => (typeof p.category === 'object' && p.category !== null ? p.category.name : p.category) === selectedCategory);
 
   const handleContactSubmit = (e) => {
     e.preventDefault();

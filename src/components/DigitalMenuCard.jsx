@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const DigitalMenuCard = () => {
-  const { products, addToCart, addToast } = useShop();
+  const { products, addToCart, addToast, shopSettings } = useShop();
   const [favoriteIds, setFavoriteIds] = useState(['2', '5']);
   const [showOriginalPoster, setShowOriginalPoster] = useState(false);
 
@@ -285,7 +285,7 @@ export const DigitalMenuCard = () => {
                   </div>
                   <div className="font-serif text-base sm:text-lg font-bold text-chocolate-950 flex items-center gap-2">
                     <span>Drashti Bhatt — 9898014090</span>
-                    <span className="text-xs text-chocolate-900 font-sans">/ {shopSettings.whatsappNumber}</span>
+                    <span className="text-xs text-chocolate-900 font-sans">/ {shopSettings?.whatsappNumber || '+91 6289760577'}</span>
                   </div>
                 </div>
               </div>

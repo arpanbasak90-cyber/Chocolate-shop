@@ -66,7 +66,7 @@ export const ProductModal = () => {
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold uppercase tracking-wider text-caramel-600">
-                {quickViewProduct.category}
+                {typeof quickViewProduct.category === 'object' && quickViewProduct.category !== null ? (quickViewProduct.category.name || 'Classics') : (quickViewProduct.category || 'Classics')}
               </span>
               <div className="flex items-center gap-1 text-gold-500 text-xs font-bold">
                 <Star className="w-3.5 h-3.5 fill-gold-500" />

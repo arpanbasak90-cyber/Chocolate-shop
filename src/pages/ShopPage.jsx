@@ -13,8 +13,9 @@ export const ShopPage = () => {
   const filteredAndSortedProducts = useMemo(() => {
     return products
       .filter((product) => {
+        const productCatName = typeof product.category === 'object' && product.category !== null ? product.category.name : product.category;
         const matchesCategory =
-          selectedCategory === 'All Chocolates' || product.category === selectedCategory;
+          selectedCategory === 'All Chocolates' || productCatName === selectedCategory;
         const matchesSearch =
           product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           product.shortDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||

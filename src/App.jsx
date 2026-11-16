@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ShopProvider, useShop } from './context/ShopContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { FirstScreen } from './components/FirstScreen';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -73,10 +74,12 @@ function MainAppContent() {
 
 export default function App() {
   return (
-    <ShopProvider>
-      <Router>
-        <MainAppContent />
-      </Router>
-    </ShopProvider>
+    <ErrorBoundary>
+      <ShopProvider>
+        <Router>
+          <MainAppContent />
+        </Router>
+      </ShopProvider>
+    </ErrorBoundary>
   );
 }

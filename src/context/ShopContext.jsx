@@ -11,7 +11,11 @@ const DEFAULT_SETTINGS = {
   contactEmail: 'zorashop.homemade@gmail.com',
   shopAddress: 'Handcrafted Boutique Kitchen, Ahmedabad, Gujarat, India',
   standardDeliveryFee: 40,
-  deliveryFeeThreshold: 500
+  deliveryFee: 40,
+  deliveryFeeThreshold: 500,
+  freeDeliveryThreshold: 500,
+  promoCode: 'SWEET10',
+  promoDiscountPercent: 10
 };
 
 export const ShopProvider = ({ children }) => {
@@ -82,13 +86,36 @@ export const ShopProvider = ({ children }) => {
     }
   }, [cart]);
 
+  // Safely normalize product attributes from backend (handles relation objects and stringified JSON)
+  const normalizeProduct = (p) => {
+    if (!p) return null;
+    const categoryName = typeof p.category === 'object' && p.category !== null
+      ? (p.category.name || 'Classics')
+      : (p.category || 'Classics');
+    let ingredients = p.ingredients;
+    if (typeof ingredients === 'string') {
+      try {
+        ingredients = JSON.parse(ingredients);
+      } catch {
+        ingredients = [ingredients];
+      }
+    }
+    return {
+      ...p,
+      category: categoryName,
+      categoryName,
+      categoryObj: typeof p.category === 'object' ? p.category : null,
+      ingredients: Array.isArray(ingredients) ? ingredients : []
+    };
+  };
+
   // Fetch Live Products from Server
   const fetchProducts = useCallback(async () => {
     setIsProductsLoading(true);
     try {
       const res = await api.getProducts();
       if (res.success && Array.isArray(res.products) && res.products.length > 0) {
-        setProducts(res.products);
+        setProducts(res.products.map(normalizeProduct).filter(Boolean));
       }
     } catch (err) {
       console.warn('Using initial products catalogue:', err.message);

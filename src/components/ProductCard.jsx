@@ -87,7 +87,7 @@ export const ProductCard = ({ product }) => {
         <div>
           {/* Category */}
           <div className="text-[11px] font-semibold uppercase tracking-wider text-caramel-600 mb-1">
-            {product.category}
+            {typeof product.category === 'object' && product.category !== null ? (product.category.name || 'Classics') : (product.category || 'Classics')}
           </div>
 
           {/* Title */}
