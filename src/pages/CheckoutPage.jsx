@@ -68,6 +68,14 @@ export const CheckoutPage = () => {
       return;
     }
 
+    // Strict payment guard: Cash on Delivery (COD) is the ONLY available method
+    if (paymentMethod !== 'COD') {
+      setPaymentMethod('COD');
+      setErrorMessage('Currently, we accept Cash on Delivery (COD) only. UPI payment is temporarily unavailable.');
+      addToast('Currently, we accept Cash on Delivery (COD) only. UPI payment is temporarily unavailable.', 'warning');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -200,6 +208,24 @@ export const CheckoutPage = () => {
         <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-full font-semibold">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
           <span>Verified Customer: <strong>{currentCustomer?.name}</strong></span>
+        </div>
+      </div>
+
+      {/* Prominent Payment Notice on Checkout Page */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-amber-500/10 border-2 border-amber-500/50 text-amber-950 flex items-start gap-3.5 shadow-sm">
+        <div className="w-9 h-9 rounded-2xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 text-lg select-none">
+          ⚠️
+        </div>
+        <div className="space-y-1">
+          <h4 className="font-serif font-bold text-base text-chocolate-950">
+            Important Payment Notice
+          </h4>
+          <p className="text-sm font-semibold text-amber-900 leading-snug">
+            Currently, we accept Cash on Delivery (COD) only. UPI payment is temporarily unavailable.
+          </p>
+          <p className="text-xs text-stone-600 leading-relaxed">
+            Cash on Delivery is the only way to complete an order at this time. Please have cash ready upon delivery of your freshly tempered chocolates.
+          </p>
         </div>
       </div>
 
@@ -340,76 +366,94 @@ export const CheckoutPage = () => {
 
             {/* 3. Payment Method Options */}
             <div className="bg-white rounded-3xl p-6 border border-cream-300 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-cream-200">
-                <CreditCard className="w-4 h-4 text-caramel-600" />
-                <h3 className="font-serif text-base font-bold text-[#3c1b11]">
-                  Payment Method
-                </h3>
+              <div className="flex items-center justify-between pb-2 border-b border-cream-200">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-caramel-600" />
+                  <h3 className="font-serif text-base font-bold text-[#3c1b11]">
+                    Payment Method
+                  </h3>
+                </div>
+                <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                  COD Only Active
+                </span>
+              </div>
+
+              {/* Prominent Payment Notice Box */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-400 text-amber-950 flex items-start gap-3 shadow-sm">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs sm:text-sm space-y-0.5">
+                  <span className="font-bold text-amber-950 block">Payment Availability Notice</span>
+                  <p className="font-semibold text-amber-900">
+                    Currently, we accept Cash on Delivery (COD) only. UPI payment is temporarily unavailable.
+                  </p>
+                  <p className="text-xs text-stone-600 pt-0.5">
+                    Customers must select Cash on Delivery to place their order. Cash will be collected upon delivery.
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Option A: Cash on Delivery */}
-                <label
-                  className={`p-4 rounded-2xl border-2 cursor-pointer flex flex-col justify-between transition-all ${
-                    paymentMethod === 'COD'
-                      ? 'border-[#3c1b11] bg-caramel-50/50 shadow-sm'
-                      : 'border-cream-300 hover:border-caramel-300'
-                  }`}
+                {/* Option A: Cash on Delivery (Available & Active) */}
+                <div
+                  className="p-4 rounded-2xl border-2 border-[#3c1b11] bg-caramel-50/70 shadow-sm flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-sm text-[#3c1b11]">Cash on Delivery</span>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="COD"
-                      checked={paymentMethod === 'COD'}
-                      onChange={() => setPaymentMethod('COD')}
-                      className="accent-[#3c1b11]"
-                    />
-                  </div>
-                  <p className="text-xs text-stone-600">
-                    Pay with cash when your fresh chocolate order arrives at your door.
-                  </p>
-                </label>
-
-                {/* Option B: Online Payment via Razorpay */}
-                <label
-                  className={`p-4 rounded-2xl border-2 cursor-pointer flex flex-col justify-between transition-all ${
-                    paymentMethod === 'RAZORPAY' || paymentMethod === 'UPI'
-                      ? 'border-[#3c1b11] bg-caramel-50/50 shadow-sm'
-                      : 'border-cream-300 hover:border-caramel-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-sm text-[#3c1b11]">Online Payment</span>
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">UPI / Cards</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[#3c1b11]">Cash on Delivery</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        ✓ Available
+                      </span>
                     </div>
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="RAZORPAY"
-                      checked={paymentMethod === 'RAZORPAY' || paymentMethod === 'UPI'}
-                      onChange={() => setPaymentMethod('RAZORPAY')}
-                      className="accent-[#3c1b11]"
+                      value="COD"
+                      checked={true}
+                      readOnly
+                      className="accent-[#3c1b11] w-4 h-4"
                     />
                   </div>
-                  <p className="text-xs text-stone-600">
-                    Instant UPI QR, Google Pay, PhonePe, Cards, Net Banking via Razorpay.
+                  <p className="text-xs text-stone-700 leading-relaxed">
+                    Pay with cash when your fresh chocolate order arrives at your door. Cash on Delivery is currently the only way to complete an order.
                   </p>
-                </label>
+                </div>
+
+                {/* Option B: Online Payment via Razorpay / UPI (Disabled & Unavailable) */}
+                <div
+                  onClick={() => addToast('UPI payment is temporarily unavailable. Please select Cash on Delivery (COD).', 'warning')}
+                  className="p-4 rounded-2xl border-2 border-dashed border-stone-300 bg-stone-100/70 opacity-60 cursor-not-allowed select-none flex flex-col justify-between relative"
+                  title="UPI payment is currently unavailable"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-sm text-stone-500">UPI / Online Payment</span>
+                      <span className="text-[10px] bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-bold">
+                        Unavailable
+                      </span>
+                    </div>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="UPI"
+                      disabled
+                      checked={false}
+                      className="cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-xs text-stone-500">
+                    UPI, Google Pay, PhonePe, Cards and Net Banking are temporarily offline. Customers must complete order via COD.
+                  </p>
+                </div>
               </div>
 
-              {paymentMethod === 'COD' ? (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                  💵 Please keep exact cash of <strong>₹{grandTotal}</strong> ready upon delivery.
+              {/* COD Requirement Confirmation */}
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-950 flex items-start gap-2.5">
+                <span className="text-base shrink-0">💵</span>
+                <div>
+                  <strong className="block font-bold text-amber-900">Cash on Delivery is Required</strong>
+                  <span>Please keep exact cash of <strong>₹{grandTotal}</strong> ready upon delivery. Our boutique delivery partner will collect payment at your doorstep.</span>
                 </div>
-              ) : (
-                <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Secure 256-bit encrypted transaction verified directly by backend signature.</span>
-                </div>
-              )}
+              </div>
 
             </div>
 
@@ -485,7 +529,7 @@ export const CheckoutPage = () => {
                   </>
                 ) : (
                   <>
-                    <span>Place Order (₹{grandTotal})</span>
+                    <span>Place Cash on Delivery Order (₹{grandTotal})</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

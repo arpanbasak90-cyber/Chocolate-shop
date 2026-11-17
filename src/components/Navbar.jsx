@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
+import { PaymentAnnouncementBanner } from './PaymentAnnouncementBanner';
 import {
   ShoppingBag,
   Menu,
@@ -170,6 +171,9 @@ export const Navbar = () => {
           </div>
         )}
       </header>
+
+      {/* Payment Availability Announcement (Positioned clearly below the main navigation bar) */}
+      <PaymentAnnouncementBanner />
     </>
   );
 };

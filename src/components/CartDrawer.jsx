@@ -274,6 +274,14 @@ export const CartDrawer = () => {
                 </div>
               </div>
 
+              {/* Payment Availability Notice */}
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-400/50 text-[11px] text-amber-950 flex items-start gap-2">
+                <span className="text-sm shrink-0 mt-0.5">⚠️</span>
+                <span className="leading-tight">
+                  <strong>Cash on Delivery (COD) only:</strong> UPI payment is currently unavailable. Please select COD at checkout.
+                </span>
+              </div>
+
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"

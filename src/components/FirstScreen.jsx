@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useShop } from '../context/ShopContext';
+import { PaymentAnnouncementBanner } from './PaymentAnnouncementBanner';
 import { ShoppingBag, Store, ArrowRight, User, Mail, Phone, KeyRound, ShieldCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const FirstScreen = () => {
@@ -105,7 +106,12 @@ export const FirstScreen = () => {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-caramel-600/15 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gold-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div className="w-full max-w-4xl relative z-10 space-y-8 animate-fadeIn">
+      <div className="w-full max-w-4xl relative z-10 space-y-6 animate-fadeIn">
+
+        {/* Payment Availability Announcement */}
+        <div className="rounded-2xl overflow-hidden shadow-lg border border-amber-500/40">
+          <PaymentAnnouncementBanner />
+        </div>
 
         {/* TOP BRAND HEADER */}
         <div className="rounded-3xl bg-[#3c1b11] border-2 border-[#5a2c1b] p-6 sm:p-8 text-center text-cream-100 shadow-2xl relative overflow-hidden">

@@ -188,6 +188,11 @@ export const ProductModal = () => {
               )}
             </button>
           </div>
+
+          <p className="mt-2.5 text-[11px] text-center text-stone-500 flex items-center justify-center gap-1.5">
+            <span>⚠️</span>
+            <span>Cash on Delivery (COD) available • UPI payment currently unavailable</span>
+          </p>
         </div>
       </div>
     </div>

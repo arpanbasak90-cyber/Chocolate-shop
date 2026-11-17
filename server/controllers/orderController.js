@@ -24,8 +24,18 @@ export async function createCheckoutOrder(req, res) {
       return res.status(400).json({ success: false, message: 'Your shopping cart is empty.' });
     }
 
-    const validMethods = ['COD', 'RAZORPAY', 'UPI'];
-    const chosenMethod = validMethods.includes(paymentMethod) ? paymentMethod : 'COD';
+    // Strict Server-Side COD-Only Enforcement:
+    // Accept only the string 'COD' (case-insensitive after trimming whitespace).
+    // Reject UPI, RAZORPAY, ONLINE, CRYPTO, arbitrary strings, null, and missing values.
+    const normalizedPaymentMethod = typeof paymentMethod === 'string' ? paymentMethod.trim().toUpperCase() : '';
+    if (normalizedPaymentMethod !== 'COD') {
+      return res.status(400).json({
+        success: false,
+        message: 'Currently, Cash on Delivery (COD) is the only accepted payment method. UPI and online payments are temporarily unavailable.'
+      });
+    }
+
+    const chosenMethod = 'COD';
 
     // Strictly recalculate totals from database products
     const verified = await calculateVerifiedCart(items, promoCode);
@@ -48,7 +58,7 @@ export async function createCheckoutOrder(req, res) {
     }
 
     // Initial payment status
-    const initialPaymentStatus = chosenMethod === 'COD' ? 'Pending (Cash on Delivery)' : 'Pending Online Payment';
+    const initialPaymentStatus = 'Pending (Cash on Delivery)';
 
     // Save order in persistent database
     const order = await db.createOrder({

@@ -123,6 +123,12 @@ export const CustomerAccountPage = () => {
                 </p>
               </div>
 
+              {/* Payment Method Notice */}
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-400/50 text-xs text-amber-950 flex items-center gap-2">
+                <span className="text-sm shrink-0">⚠️</span>
+                <span><strong>Payment Notice:</strong> Orders are currently fulfilled via Cash on Delivery (COD) only.</span>
+              </div>
+
               {errorMessage && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
