@@ -18,12 +18,13 @@ import {
 } from 'lucide-react';
 
 export const OrderConfirmationPage = () => {
-  const { orders, activeOrderId, setActiveOrderId, shopSettings, addToast } = useShop();
+  const { orders, activeOrderId, setActiveOrderId, shopSettings, addToast, currentCustomer } = useShop();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const orderId = location.state?.orderId || activeOrderId;
-  const currentOrder = orders.find((o) => o.id === orderId) || orders[0];
+  const passedOrder = location.state?.order;
+  const orderId = location.state?.orderId || passedOrder?.id || activeOrderId;
+  const currentOrder = passedOrder || (Array.isArray(orders) ? orders.find((o) => o.id === orderId) || orders[0] : null);
 
   const [copiedMessage, setCopiedMessage] = useState(false);
 
@@ -53,14 +54,14 @@ export const OrderConfirmationPage = () => {
   }
 
   // Format WhatsApp message text
-  const itemsText = currentOrder.items
+  const itemsText = (currentOrder.items || [])
     .map((item) => `• ${item.quantity}x ${item.name} (${item.packageName}) - ₹${item.total}`)
     .join('\n');
 
   const formattedWhatsAppText = `*🍫 NEW ORDER - ZORA SHOP*
 *Order Number:* ${currentOrder.orderNumber || `#${currentOrder.id}`}
-*Customer:* ${currentOrder.customer?.name || 'Customer'}
-*Phone:* ${currentOrder.customer?.phone || 'N/A'}
+*Customer:* ${currentOrder.customer?.name || currentCustomer?.name || 'Customer'}
+*Phone:* ${currentOrder.customer?.phone || currentCustomer?.phone || 'N/A'}
 *Address:* ${currentOrder.address?.house ? `${currentOrder.address.house}, ` : ''}${currentOrder.address?.street || ''}, ${currentOrder.address?.city || ''} - ${currentOrder.address?.pincode || ''}
 
 *Chocolates Ordered:*
@@ -105,7 +106,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
         </div>
 
         <h1 className="font-serif text-3xl sm:text-4xl font-bold text-white mb-2">
-          Thank You, {currentOrder.customer.name}!
+          Thank You, {currentOrder.customer?.name || currentCustomer?.name || 'Customer'}!
         </h1>
         <p className="text-sm text-caramel-200 max-w-lg mx-auto">
           Your homemade chocolates are being queued for fresh small-batch tempering.
@@ -152,7 +153,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
 
         {/* Items List */}
         <div className="divide-y divide-cream-200">
-          {currentOrder.items.map((item, idx) => (
+          {(currentOrder.items || []).map((item, idx) => (
             <div key={idx} className="py-3 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <img
@@ -174,7 +175,7 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
                   ₹{item.total}
                 </div>
                 <div className="text-[11px] text-stone-400">
-                  ₹{item.unitPrice} each
+                  ₹{item.unitPrice || item.price} each
                 </div>
               </div>
             </div>
@@ -216,12 +217,12 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
               <span>Delivery Address</span>
             </h5>
             <p className="text-xs text-stone-700 leading-relaxed">
-              {currentOrder.address.house}, {currentOrder.address.street}
-              {currentOrder.address.landmark && `, ${currentOrder.address.landmark}`}
+              {currentOrder.address?.house ? `${currentOrder.address.house}, ` : ''}{currentOrder.address?.street || ''}
+              {currentOrder.address?.landmark && `, ${currentOrder.address.landmark}`}
               <br />
-              {currentOrder.address.city}, {currentOrder.address.state} - {currentOrder.address.pincode}
+              {currentOrder.address?.city || ''}{currentOrder.address?.state ? `, ${currentOrder.address.state}` : ''}{currentOrder.address?.pincode ? ` - ${currentOrder.address.pincode}` : ''}
             </p>
-            {currentOrder.address.instructions && (
+            {currentOrder.address?.instructions && (
               <p className="text-[11px] text-stone-500 italic mt-1">
                 Note: {currentOrder.address.instructions}
               </p>
@@ -234,11 +235,11 @@ _Thank you for ordering with ZORA SHOP! Sweetness in Every Bite!_`;
               <span>Customer Details</span>
             </h5>
             <p className="text-xs text-stone-700 leading-relaxed">
-              <strong>Name:</strong> {currentOrder.customer.name}
+              <strong>Name:</strong> {currentOrder.customer?.name || currentCustomer?.name || 'Customer'}
               <br />
-              <strong>Phone:</strong> {currentOrder.customer.phone}
+              <strong>Phone:</strong> {currentOrder.customer?.phone || currentCustomer?.phone || 'N/A'}
               <br />
-              <strong>Email:</strong> {currentOrder.customer.email}
+              <strong>Email:</strong> {currentOrder.customer?.email || currentCustomer?.email || 'N/A'}
             </p>
           </div>
         </div>

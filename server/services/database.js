@@ -1043,6 +1043,7 @@ export const db = {
         where: { customerId },
         include: {
           items: true,
+          customer: true,
           address: true,
           statusHistory: { orderBy: { createdAt: 'asc' } },
           payments: true
