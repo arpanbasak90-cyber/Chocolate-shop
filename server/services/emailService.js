@@ -144,16 +144,17 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
   }
 
   // Resend API Integration
-  if (config.resend.apiKey) {
+  const resendApiKey = typeof config.resend?.apiKey === 'string' ? config.resend.apiKey.trim() : '';
+  if (resendApiKey) {
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${config.resend.apiKey}`,
+          'Authorization': `Bearer ${resendApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: config.resend.from || 'onboarding@resend.dev',
+          from: config.resend.from || 'ZORA SHOP <onboarding@resend.dev>',
           to: toEmail,
           subject,
           html: htmlContent
@@ -169,7 +170,7 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
         const errorReason = data.message || res.statusText || 'Resend delivery rejected';
         console.warn(`⚠️ Resend dispatch notice for ${toEmail}: ${errorReason}`);
         return {
-          success: true,
+          success: false,
           provider: 'Resend',
           deliveredToInbox: false,
           reason: errorReason
@@ -178,20 +179,30 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
     } catch (err) {
       console.error('❌ Resend API request failed:', err.message);
       return {
-        success: true,
-        provider: 'LocalFallback',
+        success: false,
+        provider: 'Resend',
         deliveredToInbox: false,
-        reason: err.message
+        reason: 'Network error communicating with email provider'
       };
     }
+  } else {
+    console.warn('⚠️ Email delivery skipped: RESEND_API_KEY is not configured.');
   }
 
   // Fallback: If external delivery encounters restrictions or in local dev mode, log prominently in server console
-  console.log('\n═══════════════════════════════════════════════════════════════════');
-  console.log(`📢 [REAL EMAIL OTP NOTICE] To: ${toEmail}`);
-  console.log(`🔑 Verification Code: ${otpCode}`);
-  console.log(`💡 Delivered via active Zora Shop verification engine.`);
-  console.log('═══════════════════════════════════════════════════════════════════\n');
-  return { success: true, deliveredToInbox: false, isDevConsole: true };
+  if (config.nodeEnv !== 'production') {
+    console.log('\n═══════════════════════════════════════════════════════════════════');
+    console.log(`📢 [DEV CONSOLE OTP NOTICE] To: ${toEmail}`);
+    console.log(`🔑 Verification Code: ${otpCode}`);
+    console.log(`💡 Note: Configure RESEND_API_KEY in server/.env for real email inbox delivery.`);
+    console.log('═══════════════════════════════════════════════════════════════════\n');
+    return { success: true, deliveredToInbox: false, isDevConsole: true };
+  }
+
+  return {
+    success: false,
+    deliveredToInbox: false,
+    error: 'Email delivery service is not configured (RESEND_API_KEY is missing).'
+  };
 }
 
