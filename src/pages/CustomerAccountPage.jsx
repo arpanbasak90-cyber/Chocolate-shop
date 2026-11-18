@@ -17,8 +17,11 @@ import {
   ArrowRight,
   ShieldCheck,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Download
 } from 'lucide-react';
+import { InvoiceModal } from '../components/InvoiceModal';
 
 export const CustomerAccountPage = () => {
   const {
@@ -28,10 +31,25 @@ export const CustomerAccountPage = () => {
     customerLogout,
     orders,
     setActiveOrderId,
+    downloadInvoicePdf,
     addToast
   } = useShop();
 
   const navigate = useNavigate();
+
+  // Invoice Modal & Download State
+  const [viewingInvoiceOrderId, setViewingInvoiceOrderId] = useState(null);
+  const [downloadingOrderIds, setDownloadingOrderIds] = useState({});
+
+  const handleDownloadPdf = async (orderId, orderNumber) => {
+    if (downloadingOrderIds[orderId]) return;
+    setDownloadingOrderIds((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      await downloadInvoicePdf(orderId, orderNumber);
+    } finally {
+      setDownloadingOrderIds((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
 
   // Customer Login Form State (Instant Direct Login)
   const [name, setName] = useState('');
@@ -534,23 +552,51 @@ export const CustomerAccountPage = () => {
                       </div>
 
                       {/* Footer & Tracking Button */}
-                      <div className="pt-2 border-t border-cream-200 flex items-center justify-between">
+                      <div className="pt-2 border-t border-cream-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="text-xs">
                           <span className="text-stone-500">Total: </span>
                           <span className="font-bold text-caramel-700 font-serif text-sm">₹{ord.grandTotal}</span>
                           <span className="text-stone-400 text-[10px] ml-1">({ord.paymentMethod})</span>
                         </div>
 
-                        <button
-                          onClick={() => {
-                            setActiveOrderId(ord.id);
-                            navigate('/track');
-                          }}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-[11px] transition shadow-xs"
-                        >
-                          <span>Track Status</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {(ord.orderStatus || '').toUpperCase() === 'DELIVERED' && (
+                            <>
+                              <button
+                                onClick={() => setViewingInvoiceOrderId(ord.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cream-200 hover:bg-cream-300 text-chocolate-950 font-bold text-[11px] transition border border-cream-300 shadow-xs"
+                                title="View Delivered Order Invoice"
+                              >
+                                <FileText className="w-3 h-3 text-caramel-700" />
+                                <span>Invoice</span>
+                              </button>
+                              <button
+                                onClick={() => handleDownloadPdf(ord.id, ord.orderNumber)}
+                                disabled={downloadingOrderIds[ord.id]}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-caramel-600 hover:bg-caramel-500 text-white font-bold text-[11px] transition shadow-xs disabled:opacity-50"
+                                title="Download Official PDF Invoice"
+                              >
+                                {downloadingOrderIds[ord.id] ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Download className="w-3 h-3" />
+                                )}
+                                <span>PDF</span>
+                              </button>
+                            </>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              setActiveOrderId(ord.id);
+                              navigate('/track');
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-chocolate-900 hover:bg-chocolate-950 text-gold-300 font-bold text-[11px] transition shadow-xs"
+                          >
+                            <span>Track Status</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -563,6 +609,13 @@ export const CustomerAccountPage = () => {
 
         </div>
       )}
+
+      {/* Invoice Details Modal */}
+      <InvoiceModal
+        isOpen={Boolean(viewingInvoiceOrderId)}
+        orderId={viewingInvoiceOrderId}
+        onClose={() => setViewingInvoiceOrderId(null)}
+      />
 
     </div>
   );

@@ -24,6 +24,7 @@ model Customer {
   addresses       Address[]
   orders          Order[]
   cart            Cart?
+  invoices        Invoice[]
 
   @@index([email])
   @@index([phone])
@@ -162,10 +163,33 @@ model Order {
   items         OrderItem[]
   payments      Payment[]
   statusHistory OrderStatusHistory[]
+  invoice       Invoice?
 
   @@index([customerId])
   @@index([orderNumber])
   @@index([orderStatus])
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String   @unique
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  issuedAt      DateTime @default(now())
+  deliveryDate  DateTime
+  subtotal      Float
+  deliveryFee   Float    @default(0)
+  discount      Float    @default(0)
+  grandTotal    Float
+  paymentMethod String
+  paymentStatus String
+  snapshot      Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([customerId])
 }
 
 model OrderItem {

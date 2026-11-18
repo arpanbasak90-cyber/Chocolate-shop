@@ -523,6 +523,17 @@ export const ShopProvider = ({ children }) => {
     return editProduct(productId, { piecePrice: Number(piecePrice), boxPrice: Number(boxPrice) });
   };
 
+  const downloadInvoicePdf = useCallback(async (orderId, invoiceNumber = null) => {
+    try {
+      const res = await api.downloadOrderInvoicePdf(orderId, invoiceNumber);
+      addToast(`Invoice downloaded: ${res.filename}`, 'success');
+      return true;
+    } catch (err) {
+      addToast(err.message || 'Failed to download invoice PDF', 'error');
+      return false;
+    }
+  }, [addToast]);
+
   return (
     <ShopContext.Provider
       value={{
@@ -571,6 +582,7 @@ export const ShopProvider = ({ children }) => {
         setActiveOrderId,
         placeOrder,
         refreshCustomerOrders,
+        downloadInvoicePdf,
 
         // Store Settings & Toasts
         shopSettings,

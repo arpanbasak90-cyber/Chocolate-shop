@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { INITIAL_PRODUCTS, CATEGORIES } from '../../src/data/products.js';
+import { createInvoiceForOrder, getInvoiceByOrderId } from './invoiceService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +49,7 @@ export function mapOrderStatus(status) {
 /**
  * Robust Prisma connection manager with health verification
  */
-async function getPrismaClient() {
+export async function getPrismaClient() {
   if (globalPrisma && isPrismaConnected) {
     return globalPrisma;
   }
@@ -262,6 +263,10 @@ export const db = {
     return globalPrisma;
   },
   isPostgresReady: () => isPrismaConnected,
+
+  async getInvoiceByOrderId(orderId, tx) {
+    return getInvoiceByOrderId(orderId, tx);
+  },
 
   /**
    * Complete database health inspection
@@ -914,7 +919,8 @@ export const db = {
           customer: true,
           address: true,
           statusHistory: { orderBy: { createdAt: 'asc' } },
-          payments: true
+          payments: true,
+          invoice: true
         }
       });
 
@@ -1025,7 +1031,8 @@ export const db = {
           customer: true,
           address: true,
           statusHistory: { orderBy: { createdAt: 'asc' } },
-          payments: true
+          payments: true,
+          invoice: true
         }
       });
     }
@@ -1046,7 +1053,8 @@ export const db = {
           customer: true,
           address: true,
           statusHistory: { orderBy: { createdAt: 'asc' } },
-          payments: true
+          payments: true,
+          invoice: true
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -1080,7 +1088,8 @@ export const db = {
           customer: true,
           address: true,
           statusHistory: { orderBy: { createdAt: 'asc' } },
-          payments: true
+          payments: true,
+          invoice: true
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -1117,30 +1126,43 @@ export const db = {
 
     if (client) {
       const existing = await client.order.findFirst({
-        where: { OR: [{ id: orderId }, { orderNumber: orderId }] }
+        where: { OR: [{ id: orderId }, { orderNumber: orderId }] },
+        include: { invoice: true }
       });
       if (!existing) return null;
 
-      const updated = await client.order.update({
-        where: { id: existing.id },
-        data: {
-          orderStatus: mappedStatus,
-          statusHistory: {
-            create: {
-              status: mappedStatus,
-              notes: notes || `Order status updated to "${mappedStatus}" by ${changedBy}`,
-              changedBy
+      const updated = await client.$transaction(async (tx) => {
+        const orderRecord = await tx.order.update({
+          where: { id: existing.id },
+          data: {
+            orderStatus: mappedStatus,
+            statusHistory: {
+              create: {
+                status: mappedStatus,
+                notes: notes || `Order status updated to "${mappedStatus}" by ${changedBy}`,
+                changedBy
+              }
             }
+          },
+          include: {
+            items: true,
+            customer: true,
+            address: true,
+            statusHistory: { orderBy: { createdAt: 'asc' } },
+            payments: true,
+            invoice: true
           }
-        },
-        include: {
-          items: true,
-          customer: true,
-          address: true,
-          statusHistory: { orderBy: { createdAt: 'asc' } },
-          payments: true
+        });
+
+        // When transitioning to DELIVERED, generate invoice atomically inside this transaction
+        if (mappedStatus === 'Delivered') {
+          const invoice = await createInvoiceForOrder(existing.id, tx);
+          orderRecord.invoice = invoice;
         }
+
+        return orderRecord;
       });
+
       return updated;
     }
 

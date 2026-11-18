@@ -80,3 +80,63 @@ export async function requireAdmin(req, res, next) {
   }
 }
 
+/**
+ * Dual-Role Authentication Middleware (Owner OR Customer)
+ * Authenticates either an Owner/Admin or a verified Customer.
+ * Attaches req.admin and/or req.customer appropriately.
+ * Returns HTTP 401 if unauthenticated.
+ */
+export async function authenticateUser(req, res, next) {
+  try {
+    const adminToken = req.cookies?.[COOKIE_NAME_ADMIN];
+    const customerToken = req.cookies?.[COOKIE_NAME_CUSTOMER];
+    const bearerToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+
+    // 1. Check Owner/Admin token
+    const tokenToTryForAdmin = adminToken || bearerToken;
+    if (tokenToTryForAdmin) {
+      try {
+        const decoded = jwt.verify(tokenToTryForAdmin, config.jwtSecret);
+        if (decoded && (decoded.role === 'OWNER' || decoded.role === 'ADMIN')) {
+          const admin = await db.findAdminByEmail(decoded.email);
+          if (admin && admin.isActive) {
+            req.admin = admin;
+            req.userRole = 'OWNER';
+            return next();
+          }
+        }
+      } catch (adminErr) {
+        // Not a valid admin token, proceed to check customer token
+      }
+    }
+
+    // 2. Check Customer token
+    const tokenToTryForCustomer = customerToken || bearerToken;
+    if (tokenToTryForCustomer) {
+      try {
+        const decoded = jwt.verify(tokenToTryForCustomer, config.jwtSecret);
+        if (decoded && decoded.role === 'CUSTOMER') {
+          const customer = await db.findCustomerById(decoded.id);
+          if (customer) {
+            req.customer = customer;
+            req.userRole = 'CUSTOMER';
+            return next();
+          }
+        }
+      } catch (custErr) {
+        // Not a valid customer token
+      }
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required. Please sign in as a customer or shop owner.'
+    });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication failed. Please verify your session.'
+    });
+  }
+}
+

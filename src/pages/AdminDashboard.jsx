@@ -27,9 +27,12 @@ import {
   ExternalLink,
   Sparkles,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  FileText,
+  Download
 } from 'lucide-react';
 import { CATEGORIES } from '../data/products';
+import { InvoiceModal } from '../components/InvoiceModal';
 
 export const AdminDashboard = () => {
   const {
@@ -50,6 +53,7 @@ export const AdminDashboard = () => {
     shopSettings,
     setShopSettings,
     saveStoreSettings,
+    downloadInvoicePdf,
     addToast
   } = useShop();
 
@@ -62,6 +66,20 @@ export const AdminDashboard = () => {
 
   // Order Details Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Invoice Modal & PDF Download States
+  const [viewingInvoiceOrderId, setViewingInvoiceOrderId] = useState(null);
+  const [downloadingOrderIds, setDownloadingOrderIds] = useState({});
+
+  const handleDownloadPdf = async (orderId, orderNumber) => {
+    if (downloadingOrderIds[orderId]) return;
+    setDownloadingOrderIds((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      await downloadInvoicePdf(orderId, orderNumber);
+    } finally {
+      setDownloadingOrderIds((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
 
   // New Product Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -86,10 +104,16 @@ export const AdminDashboard = () => {
   // Normalize order status across backend variants
   const normalizeStatus = (status) => {
     if (!status) return 'Order Placed';
-    if (status === 'Order Confirmed') return 'Confirmed';
-    if (status === 'Preparing Your Chocolates') return 'Preparing';
-    if (status === 'Rejected') return 'Cancelled';
-    return status;
+    const trimmed = String(status).trim();
+    if (trimmed.toLowerCase() === 'delivered') return 'Delivered';
+    if (trimmed === 'Order Confirmed' || trimmed.toLowerCase() === 'confirmed') return 'Confirmed';
+    if (trimmed === 'Preparing Your Chocolates' || trimmed.toLowerCase() === 'preparing') return 'Preparing';
+    if (trimmed === 'Rejected' || trimmed.toLowerCase() === 'cancelled') return 'Cancelled';
+    return trimmed;
+  };
+
+  const isDeliveredStatus = (status) => {
+    return String(status || '').trim().toLowerCase() === 'delivered';
   };
 
   // Stats from live backend
@@ -451,6 +475,29 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
+                          {isDeliveredStatus(ord.orderStatus) && (
+                            <>
+                              <button
+                                onClick={() => setViewingInvoiceOrderId(ord.id)}
+                                className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40"
+                                title="View Delivered Order Invoice"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDownloadPdf(ord.id, ord.orderNumber)}
+                                disabled={downloadingOrderIds[ord.id]}
+                                className="p-1.5 rounded-lg bg-caramel-600 hover:bg-caramel-500 text-white disabled:opacity-50"
+                                title="Download Invoice PDF"
+                              >
+                                {downloadingOrderIds[ord.id] ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Download className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -620,6 +667,29 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
+                        {isDeliveredStatus(ord.orderStatus) && (
+                          <>
+                            <button
+                              onClick={() => setViewingInvoiceOrderId(ord.id)}
+                              className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40"
+                              title="View Delivered Order Invoice"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadPdf(ord.id, ord.orderNumber)}
+                              disabled={downloadingOrderIds[ord.id]}
+                              className="p-1.5 rounded-lg bg-caramel-600 hover:bg-caramel-500 text-white disabled:opacity-50"
+                              title="Download Invoice PDF"
+                            >
+                              {downloadingOrderIds[ord.id] ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => setWhatsappOrderPreview(ord)}
                           className="p-1.5 rounded-lg bg-emerald-900 hover:bg-emerald-800 text-emerald-300"
@@ -1093,6 +1163,42 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               </div>
             </div>
 
+            {/* Invoice Actions Banner (Delivered Orders) */}
+            {isDeliveredStatus(selectedOrder.orderStatus) && (
+              <div className="p-3.5 rounded-2xl bg-[#1c0c07] border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-white text-xs block">Official Invoice Available</span>
+                    <span className="text-[11px] text-stone-400">Order is delivered; immutable snapshot is recorded.</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    onClick={() => setViewingInvoiceOrderId(selectedOrder.id)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-1.5 border border-amber-500/40 transition"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Invoice</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadPdf(selectedOrder.id, selectedOrder.orderNumber)}
+                    disabled={downloadingOrderIds[selectedOrder.id]}
+                    className="px-3 py-1.5 rounded-xl bg-caramel-600 hover:bg-caramel-500 text-white font-bold text-xs flex items-center gap-1.5 transition disabled:opacity-50"
+                  >
+                    {downloadingOrderIds[selectedOrder.id] ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    <span>Download PDF</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Status Changer & Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-[#421d10]">
               <div className="flex items-center gap-2">
@@ -1351,6 +1457,13 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
           </div>
         </div>
       )}
+
+      {/* Invoice Details Modal */}
+      <InvoiceModal
+        isOpen={Boolean(viewingInvoiceOrderId)}
+        orderId={viewingInvoiceOrderId}
+        onClose={() => setViewingInvoiceOrderId(null)}
+      />
 
     </div>
   );

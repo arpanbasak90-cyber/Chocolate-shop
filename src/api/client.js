@@ -4,7 +4,9 @@
  */
 
 function resolveBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_URL;
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env)
+    ? import.meta.env.VITE_API_URL
+    : (typeof process !== 'undefined' ? process.env?.VITE_API_URL : null);
   if (!envUrl) return '/api';
   const trimmed = envUrl.trim().replace(/\/+$/, '');
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
@@ -16,7 +18,7 @@ async function request(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE_URL}${cleanEndpoint}`;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('zora_auth_token') : null;
+  const token = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('zora_auth_token') : null;
 
   const headers = {
     'Content-Type': 'application/json',
@@ -67,9 +69,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, email, phone })
     });
-    if (data?.token && typeof window !== 'undefined') {
-      localStorage.setItem('zora_auth_token', data.token);
-      localStorage.setItem('zora_auth_role', 'customer');
+    if (data?.token && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('zora_auth_token', data.token);
+      window.localStorage.setItem('zora_auth_role', 'customer');
     }
     return data;
   },
@@ -77,9 +79,9 @@ export const api = {
   verifyCustomerOtp: (params) => api.customerLogin(params),
   getCustomerMe: () => request('/auth/customer/me'),
   customerLogout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('zora_auth_token');
-      localStorage.removeItem('zora_auth_role');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('zora_auth_token');
+      window.localStorage.removeItem('zora_auth_role');
     }
     return request('/auth/customer/logout', { method: 'POST' });
   },
@@ -95,17 +97,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, emailOtp })
     });
-    if (data?.token && typeof window !== 'undefined') {
-      localStorage.setItem('zora_auth_token', data.token);
-      localStorage.setItem('zora_auth_role', 'shopkeeper');
+    if (data?.token && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('zora_auth_token', data.token);
+      window.localStorage.setItem('zora_auth_role', 'shopkeeper');
     }
     return data;
   },
   getAdminMe: () => request('/auth/admin/me'),
   adminLogout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('zora_auth_token');
-      localStorage.removeItem('zora_auth_role');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('zora_auth_token');
+      window.localStorage.removeItem('zora_auth_role');
     }
     return request('/auth/admin/logout', { method: 'POST' });
   },
@@ -125,6 +127,97 @@ export const api = {
     }),
   getMyOrders: () => request('/orders/my-orders'),
   trackOrder: (orderIdentifier) => request(`/orders/track/${orderIdentifier}`),
+
+  // Invoices (Delivered Orders)
+  getOrderInvoice: (orderId) => request(`/orders/${orderId}/invoice`),
+  downloadOrderInvoicePdf: async (orderId, invoiceNumber = null) => {
+    const cleanEndpoint = `/orders/${orderId}/invoice/pdf?download=1`;
+    const url = `${API_BASE_URL}${cleanEndpoint}`;
+
+    const token = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('zora_auth_token') : null;
+
+    const headers = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const config = {
+      method: 'GET',
+      headers,
+      credentials: 'include' // Always include HTTP-only session cookies
+    };
+
+    try {
+      const response = await fetch(url, config);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errorMsg = errData.message || (
+          response.status === 401
+            ? 'Authentication required. Please sign in to download this invoice.'
+            : response.status === 403
+            ? 'Access denied: You do not have permission to download this invoice.'
+            : response.status === 404
+            ? 'Invoice not found. Invoices are generated automatically only after delivery.'
+            : `Failed to download invoice (HTTP ${response.status})`
+        );
+        throw new Error(errorMsg);
+      }
+
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('Received empty invoice PDF from server.');
+      }
+
+      // Resolve safe filename from Content-Disposition or fallback
+      let filename = '';
+      const disposition = response.headers.get('content-disposition');
+      if (disposition) {
+        const match = disposition.match(/filename=["']?([^"';]+)["']?/i);
+        if (match && match[1]) {
+          // Extract only the basename (strip path separators & traversal components)
+          let rawName = match[1].trim().replace(/^.*[\\\/]/, '').replace(/\.\.+/g, '');
+          // Allow only safe filename characters
+          let cleanName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_');
+          // Ensure the final filename ends in .pdf and has a non-empty name before .pdf
+          if (cleanName && cleanName !== '.pdf') {
+            if (!cleanName.toLowerCase().endsWith('.pdf')) {
+              cleanName = `${cleanName}.pdf`;
+            }
+            filename = cleanName;
+          }
+        }
+      }
+
+      if (!filename) {
+        const safeNum = String(invoiceNumber || orderId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        filename = `ZORA-${safeNum}.pdf`;
+      }
+
+      // Safe browser download via Blob URL
+      if (typeof window !== 'undefined') {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        setTimeout(() => {
+          try {
+            window.URL.revokeObjectURL(blobUrl);
+          } catch {
+            // Ignore if already revoked
+          }
+        }, 1000);
+      }
+
+      return { success: true, filename };
+    } catch (error) {
+      console.error(`Error downloading PDF for order ${orderId}:`, error.message);
+      throw error;
+    }
+  },
 
   // Razorpay Payments
   verifyRazorpayPayment: ({ orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature }) =>
