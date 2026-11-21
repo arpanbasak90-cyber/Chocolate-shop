@@ -137,7 +137,7 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
         html: htmlContent
       });
       console.log(`✉️ Email OTP successfully delivered to ${toEmail} (MessageId: ${info.messageId})`);
-      return { success: true, messageId: info.messageId };
+      return { success: true, provider: 'SMTP', messageId: info.messageId, deliveredToInbox: true };
     } catch (err) {
       console.error(`❌ SMTP delivery failed to ${toEmail}:`, err.message);
     }
@@ -147,6 +147,9 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
   const resendApiKey = typeof config.resend?.apiKey === 'string' ? config.resend.apiKey.trim() : '';
   if (resendApiKey) {
     try {
+      const rawFrom = config.resend.from || 'ZORA SHOP <onboarding@resend.dev>';
+      const cleanFrom = rawFrom.replace(/["']/g, '').trim();
+
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -154,7 +157,7 @@ export async function sendEmailOtp({ toEmail, otpCode, recipientName = 'Valued C
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: config.resend.from || 'ZORA SHOP <onboarding@resend.dev>',
+          from: cleanFrom,
           to: toEmail,
           subject,
           html: htmlContent

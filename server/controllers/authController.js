@@ -142,11 +142,18 @@ export async function sendAdminOtp(req, res) {
 
     const delivery = await sendEmailOtp({ toEmail: admin.email, otpCode: emailOtp, recipientName: admin.name, isOwner: true });
 
+    if (!delivery?.deliveredToInbox && !delivery?.isDevConsole) {
+      return res.status(502).json({
+        success: false,
+        message: delivery?.reason || delivery?.error || 'Failed to deliver verification code to owner email inbox. Please verify email service configuration.'
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: delivery?.deliveredToInbox
         ? `Verification code dispatched to your registered Owner Email address (${admin.email}). (Check your email inbox or spam on your mobile/device)`
-        : `Owner verification code sent to ${admin.email}. Please check your inbox.`,
+        : `Owner verification code generated for ${admin.email}.`,
       details: {
         email: admin.email,
         deliveredToInbox: !!delivery?.deliveredToInbox
