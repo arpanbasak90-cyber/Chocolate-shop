@@ -134,6 +134,12 @@ app.use('/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/admin', adminRoutes);
 
+// Serve uploaded files statically (for local development storage)
+const publicUploadsPath = path.resolve(__dirname, '../public/uploads');
+if (fs.existsSync(publicUploadsPath)) {
+  app.use('/uploads', express.static(publicUploadsPath));
+}
+
 // Serve static frontend assets from dist in production
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -146,7 +152,8 @@ if (fs.existsSync(distPath)) {
       req.path.startsWith('/orders') ||
       req.path.startsWith('/payments') ||
       req.path.startsWith('/admin') ||
-      req.path.startsWith('/health')
+      req.path.startsWith('/health') ||
+      req.path.startsWith('/uploads')
     ) {
       return next();
     }

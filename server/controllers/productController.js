@@ -1,4 +1,5 @@
 import { db } from '../services/database.js';
+import { uploadProductImage } from '../services/storageService.js';
 
 export async function getAllProducts(req, res) {
   try {
@@ -95,6 +96,31 @@ export async function adminDeleteProduct(req, res) {
   } catch (error) {
     console.error('Error in adminDeleteProduct:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete product.' });
+  }
+}
+
+export async function adminUploadProductImage(req, res) {
+  try {
+    const { image, filename } = req.body;
+    if (!image) {
+      return res.status(400).json({ success: false, message: 'Image data is required.' });
+    }
+
+    const result = await uploadProductImage({ image, filename });
+    return res.status(200).json({
+      success: true,
+      message: 'Chocolate image uploaded successfully.',
+      imageUrl: result.url,
+      provider: result.provider,
+      bytes: result.bytes
+    });
+  } catch (error) {
+    console.error('Error in adminUploadProductImage:', error.message);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message || 'Failed to upload chocolate image.'
+    });
   }
 }
 

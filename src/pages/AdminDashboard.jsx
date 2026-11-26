@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useShop } from '../context/ShopContext';
 import {
   Store,
@@ -29,7 +29,11 @@ import {
   TrendingUp,
   RefreshCw,
   FileText,
-  Download
+  Download,
+  Upload,
+  Camera,
+  Loader2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { CATEGORIES } from '../data/products';
 import { InvoiceModal } from '../components/InvoiceModal';
@@ -45,6 +49,7 @@ export const AdminDashboard = () => {
     refreshAdminData,
     shopkeeperLogout,
     updateOrderStatus,
+    uploadProductImage,
     addProduct,
     editProduct,
     removeProduct,
@@ -81,8 +86,16 @@ export const AdminDashboard = () => {
     }
   };
 
-  // New Product Modal
+  // New Product Modal & Direct Image Upload State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [imageInputMode, setImageInputMode] = useState('upload'); // 'upload' | 'url'
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const addFileInputRef = useRef(null);
+
   const [newProd, setNewProd] = useState({
     name: '',
     category: 'Nutty Delights',
@@ -92,8 +105,76 @@ export const AdminDashboard = () => {
     shortDescription: '',
     fullDescription: '',
     badge: 'Fresh Batch',
-    image: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80'
+    image: ''
   });
+
+  const resetAddModal = () => {
+    setIsAddModalOpen(false);
+    setSelectedImageFile(null);
+    setImagePreviewUrl('');
+    setIsUploadingImage(false);
+    setUploadProgress(0);
+    setUploadError('');
+    if (addFileInputRef.current) addFileInputRef.current.value = '';
+    setNewProd({
+      name: '',
+      category: 'Nutty Delights',
+      piecePrice: 12,
+      boxPrice: 600,
+      approxPiecesPer250g: '20-24 pcs',
+      shortDescription: '',
+      fullDescription: '',
+      badge: 'Fresh Batch',
+      image: ''
+    });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadError('');
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validExt = /\.(jpe?g|png|webp)$/i.test(file.name);
+    if (!validTypes.includes(file.type.toLowerCase()) && !validExt) {
+      const err = 'Unsupported format. Please select a JPG, JPEG, PNG, or WEBP image.';
+      setUploadError(err);
+      addToast(err, 'warning');
+      return;
+    }
+
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      const err = `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds 5MB limit. Please select a smaller photo.`;
+      setUploadError(err);
+      addToast(err, 'warning');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreviewUrl(event.target.result);
+      setNewProd((prev) => ({ ...prev, image: event.target.result }));
+    };
+    reader.onerror = () => {
+      setUploadError('Failed to read image file.');
+      addToast('Failed to read image file.', 'warning');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImageFile(null);
+    setImagePreviewUrl('');
+    setUploadError('');
+    if (addFileInputRef.current) addFileInputRef.current.value = '';
+    setNewProd((prev) => ({ ...prev, image: '' }));
+  };
+
+  const handleReplaceImage = () => {
+    addFileInputRef.current?.click();
+  };
 
   // Edit Product Modal
   const [editingProduct, setEditingProduct] = useState(null);
@@ -148,25 +229,49 @@ export const AdminDashboard = () => {
   const avgOrderValue = completedPaidOrders.length > 0 ? Math.round(totalPaidRevenue / completedPaidOrders.length) : 0;
 
   // Handle Add Product Submit
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!newProd.name || !newProd.shortDescription) {
       addToast('Please enter chocolate name and description', 'warning');
       return;
     }
-    addProduct(newProd);
-    setIsAddModalOpen(false);
-    setNewProd({
-      name: '',
-      category: 'Nutty Delights',
-      piecePrice: 12,
-      boxPrice: 600,
-      approxPiecesPer250g: '20-24 pcs',
-      shortDescription: '',
-      fullDescription: '',
-      badge: 'Fresh Batch',
-      image: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80'
-    });
+
+    let finalImageUrl = newProd.image?.trim() || '';
+
+    // If an image file was selected and has base64 data preview, upload to persistent storage
+    if (selectedImageFile && (finalImageUrl.startsWith('data:') || imagePreviewUrl?.startsWith('data:'))) {
+      setIsUploadingImage(true);
+      setUploadProgress(25);
+      try {
+        setUploadProgress(50);
+        const uploadRes = await uploadProductImage({
+          image: imagePreviewUrl || finalImageUrl,
+          filename: selectedImageFile.name
+        });
+        setUploadProgress(90);
+        if (uploadRes?.imageUrl) {
+          finalImageUrl = uploadRes.imageUrl;
+          setUploadProgress(100);
+        }
+      } catch (err) {
+        setIsUploadingImage(false);
+        setUploadProgress(0);
+        addToast(`Image upload failed: ${err.message}`, 'warning');
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
+    try {
+      await addProduct({
+        ...newProd,
+        image: finalImageUrl || '/chocolate-placeholder.svg'
+      });
+      resetAddModal();
+    } catch (err) {
+      // Toast handled by ShopContext
+    }
   };
 
   // Handle Edit Product Submit
@@ -1295,7 +1400,7 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
               <h3 className="font-serif text-lg font-bold text-white">
                 Add New Chocolate Product
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-stone-400 hover:text-white">
+              <button onClick={resetAddModal} className="text-stone-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1347,29 +1452,187 @@ _Crafted fresh with pure cocoa at Zora Shop! Sweetness in Every Bite!_`;
                 ></textarea>
               </div>
 
-              <div>
-                <label className="block font-bold text-stone-300 uppercase mb-1">Image URL</label>
-                <input
-                  type="url"
-                  value={newProd.image}
-                  onChange={(e) => setNewProd({ ...newProd, image: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-[#1c0c07] border border-[#421d10] text-xs text-white"
-                />
+              {/* Chocolate Photograph Upload & URL Toggle */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-stone-300 uppercase text-[11px] tracking-wider">
+                    Chocolate Photograph
+                  </label>
+                  <div className="inline-flex bg-[#1c0c07] p-0.5 rounded-lg border border-[#421d10]">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('upload')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1.5 ${
+                        imageInputMode === 'upload'
+                          ? 'bg-caramel-600 text-white shadow'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Upload Photo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('url')}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center gap-1.5 ${
+                        imageInputMode === 'url'
+                          ? 'bg-caramel-600 text-white shadow'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Image URL</span>
+                    </button>
+                  </div>
+                </div>
+
+                {imageInputMode === 'upload' ? (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      ref={addFileInputRef}
+                      onChange={handleFileChange}
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      className="hidden"
+                    />
+
+                    {imagePreviewUrl ? (
+                      <div className="relative rounded-2xl bg-[#1c0c07] border border-[#421d10] p-3 flex flex-col sm:flex-row items-center gap-3">
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-black/40 border border-[#421d10] flex-shrink-0">
+                          <img
+                            src={imagePreviewUrl}
+                            alt="Chocolate preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1.5 w-full text-left">
+                          <div className="text-white font-bold truncate text-xs">
+                            {selectedImageFile?.name || 'Selected Photograph'}
+                          </div>
+                          <div className="text-[11px] text-stone-400 flex items-center gap-2">
+                            {selectedImageFile?.size && (
+                              <span>{(selectedImageFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                            )}
+                            <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Ready to Save
+                            </span>
+                          </div>
+
+                          {/* Upload Progress Indicator */}
+                          {isUploadingImage && (
+                            <div className="w-full space-y-1 pt-1">
+                              <div className="flex justify-between text-[10px] text-caramel-300 font-semibold">
+                                <span className="flex items-center gap-1">
+                                  <Loader2 className="w-3 h-3 animate-spin" /> Uploading to cloud storage...
+                                </span>
+                                <span>{uploadProgress}%</span>
+                              </div>
+                              <div className="w-full bg-[#2b130a] rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-gradient-to-r from-caramel-500 to-amber-500 h-1.5 rounded-full transition-all duration-300"
+                                  style={{ width: `${uploadProgress}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons: Replace & Remove */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleReplaceImage}
+                              disabled={isUploadingImage}
+                              className="px-2.5 py-1 rounded-lg bg-[#3c1b11] hover:bg-[#4d2316] text-stone-300 text-[11px] font-semibold transition flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Camera className="w-3 h-3" />
+                              <span>Replace</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveImage}
+                              disabled={isUploadingImage}
+                              className="px-2.5 py-1 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-300 text-[11px] font-semibold transition flex items-center gap-1 border border-red-800/40 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => addFileInputRef.current?.click()}
+                        className="rounded-2xl border-2 border-dashed border-[#572816] hover:border-caramel-500 bg-[#1c0c07]/80 hover:bg-[#230f09] p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-[#2e140b] text-caramel-400 group-hover:text-caramel-300 flex items-center justify-center transition shadow-inner">
+                          <Upload className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
+                        </div>
+                        <div>
+                          <div className="text-white font-bold text-xs group-hover:text-caramel-300 transition">
+                            Click to choose chocolate photo from your device
+                          </div>
+                          <div className="text-[11px] text-stone-400 mt-0.5">
+                            Supports JPG, JPEG, PNG, WEBP (Max 5MB)
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {uploadError && (
+                      <div className="text-red-400 text-[11px] font-medium flex items-center gap-1.5 p-2 rounded-lg bg-red-950/30 border border-red-900/40">
+                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{uploadError}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="url"
+                      value={newProd.image}
+                      onChange={(e) => {
+                        setNewProd({ ...newProd, image: e.target.value });
+                        setImagePreviewUrl(e.target.value);
+                      }}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="w-full px-3 py-2 rounded-xl bg-[#1c0c07] border border-[#421d10] text-xs text-white"
+                    />
+                    <p className="text-[11px] text-stone-400">
+                      Paste a direct image URL (Unsplash, CDN, or web photo).
+                    </p>
+                    {newProd.image && (
+                      <div className="mt-2 flex items-center gap-3 p-2 bg-[#1c0c07] rounded-xl border border-[#421d10]">
+                        <img
+                          src={newProd.image}
+                          alt="URL preview"
+                          className="w-12 h-12 rounded-lg object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/chocolate-placeholder.svg';
+                          }}
+                        />
+                        <span className="text-[11px] text-stone-300 truncate">{newProd.image}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-[#3c1b11] text-stone-300 font-bold"
+                  onClick={resetAddModal}
+                  disabled={isUploadingImage}
+                  className="px-4 py-2 rounded-xl bg-[#3c1b11] hover:bg-[#4d2316] text-stone-300 font-bold transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 text-white font-bold"
+                  disabled={isUploadingImage}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-caramel-600 to-caramel-700 hover:from-caramel-500 hover:to-caramel-600 text-white font-bold shadow-md transition flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Chocolate
+                  {isUploadingImage && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isUploadingImage ? 'Uploading & Saving...' : 'Save Chocolate'}</span>
                 </button>
               </div>
             </form>

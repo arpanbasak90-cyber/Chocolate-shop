@@ -247,6 +247,11 @@ export const api = {
     }),
 
   // Admin Product Catalog CRUD
+  adminUploadProductImage: (data) =>
+    request('/products/admin/upload-image', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
   adminCreateProduct: (data) =>
     request('/products/admin', {
       method: 'POST',

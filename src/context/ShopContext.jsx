@@ -471,15 +471,27 @@ export const ShopProvider = ({ children }) => {
     }
   };
 
+  const uploadProductImage = async ({ image, filename }) => {
+    try {
+      const res = await api.adminUploadProductImage({ image, filename });
+      return res;
+    } catch (err) {
+      addToast(err.message, 'warning');
+      throw err;
+    }
+  };
+
   const addProduct = async (productData) => {
     try {
       const res = await api.adminCreateProduct(productData);
       if (res.success) {
         addToast('New chocolate variety created!');
         fetchProducts();
+        return res;
       }
     } catch (err) {
       addToast(err.message, 'warning');
+      throw err;
     }
   };
 
@@ -600,6 +612,7 @@ export const ShopProvider = ({ children }) => {
         adminDataError,
         refreshAdminData,
         updateOrderStatus,
+        uploadProductImage,
         addProduct,
         editProduct,
         removeProduct,
