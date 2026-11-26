@@ -394,7 +394,26 @@ export const db = {
 
   async createProduct(data) {
     const id = data.id || `prod-${Date.now()}`;
-    const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const categoryName = (typeof data.category === 'string' ? data.category.trim() : '') || 'Classics';
+    const categorySlug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    let categoryRelation;
+    if (data.categoryId) {
+      categoryRelation = { connect: { id: data.categoryId } };
+    } else {
+      categoryRelation = {
+        connectOrCreate: {
+          where: { name: categoryName },
+          create: {
+            name: categoryName,
+            slug: categorySlug,
+            description: `Handcrafted ${categoryName} boutique homemade creations.`
+          }
+        }
+      };
+    }
+
     const newProduct = {
       id,
       slug,
@@ -402,15 +421,15 @@ export const db = {
       piecePrice: Number(data.piecePrice),
       boxPrice: Number(data.boxPrice),
       approxPiecesPer250g: data.approxPiecesPer250g || '20-24 pcs',
-      category: data.category || 'Classics',
+      category: categoryRelation,
       tag: data.tag || 'Handmade',
       badge: data.badge || 'Fresh Batch',
-      rating: 5.0,
-      reviewsCount: 1,
+      rating: typeof data.rating === 'number' ? data.rating : 5.0,
+      reviewsCount: typeof data.reviewsCount === 'number' ? data.reviewsCount : 1,
       shortDescription: data.shortDescription,
       fullDescription: data.fullDescription || data.shortDescription,
       ingredients: typeof data.ingredients === 'string' ? data.ingredients : JSON.stringify(data.ingredients || []),
-      dietary: '100% Pure Vegetarian',
+      dietary: data.dietary || '100% Pure Vegetarian',
       shelfLife: data.shelfLife || '45 Days',
       isAvailable: data.isAvailable !== false,
       isBestseller: !!data.isBestseller,
@@ -420,7 +439,10 @@ export const db = {
 
     const client = await getPrismaClient();
     if (client) {
-      const created = await client.product.create({ data: newProduct });
+      const created = await client.product.create({
+        data: newProduct,
+        include: { category: true }
+      });
       return formatProductRecord(created);
     }
 
@@ -429,17 +451,66 @@ export const db = {
     }
 
     const local = readLocalDb();
-    local.products.unshift(newProduct);
+    const localProduct = {
+      ...newProduct,
+      category: categoryName
+    };
+    local.products.unshift(localProduct);
     writeLocalDb(local);
-    return formatProductRecord(newProduct);
+    return formatProductRecord(localProduct);
   },
 
   async updateProduct(id, data) {
+    const updateData = { ...data };
+    delete updateData.id;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
+    delete updateData.categoryName;
+    delete updateData.categoryObj;
+    delete updateData.orderItems;
+    delete updateData.cartItems;
+
+    let categoryRelation = undefined;
+    if (updateData.categoryId) {
+      categoryRelation = { connect: { id: updateData.categoryId } };
+      delete updateData.categoryId;
+      delete updateData.category;
+    } else if (typeof updateData.category === 'string' && updateData.category.trim()) {
+      const categoryName = updateData.category.trim();
+      const categorySlug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      categoryRelation = {
+        connectOrCreate: {
+          where: { name: categoryName },
+          create: {
+            name: categoryName,
+            slug: categorySlug,
+            description: `Handcrafted ${categoryName} boutique homemade creations.`
+          }
+        }
+      };
+      delete updateData.category;
+    } else if ('category' in updateData) {
+      delete updateData.category;
+    }
+
+    if (categoryRelation) {
+      updateData.category = categoryRelation;
+    }
+
+    if (updateData.piecePrice !== undefined) updateData.piecePrice = Number(updateData.piecePrice);
+    if (updateData.boxPrice !== undefined) updateData.boxPrice = Number(updateData.boxPrice);
+    if (updateData.rating !== undefined) updateData.rating = Number(updateData.rating);
+    if (updateData.reviewsCount !== undefined) updateData.reviewsCount = Number(updateData.reviewsCount);
+    if (updateData.ingredients && typeof updateData.ingredients !== 'string') {
+      updateData.ingredients = JSON.stringify(updateData.ingredients);
+    }
+
     const client = await getPrismaClient();
     if (client) {
       const updated = await client.product.update({
         where: { id },
-        data
+        data: updateData,
+        include: { category: true }
       });
       return formatProductRecord(updated);
     }
@@ -451,9 +522,11 @@ export const db = {
     const local = readLocalDb();
     const idx = (local.products || []).findIndex(p => p.id === id);
     if (idx === -1) return null;
+    const catName = typeof data.category === 'string' ? data.category.trim() : local.products[idx].category;
     local.products[idx] = {
       ...local.products[idx],
       ...data,
+      category: catName,
       updatedAt: new Date().toISOString()
     };
     writeLocalDb(local);
